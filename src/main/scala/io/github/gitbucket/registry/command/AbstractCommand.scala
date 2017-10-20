@@ -5,6 +5,10 @@ import java.io.{InputStream, OutputStream}
 import org.apache.sshd.server.{Command, Environment, ExitCallback}
 
 abstract class AbstractCommand extends Command {
+
+  protected val Success = 0
+  protected val Failure = -1
+
   protected var in: InputStream = null
   protected var out: OutputStream = null
   protected var err: OutputStream = null
@@ -14,15 +18,15 @@ abstract class AbstractCommand extends Command {
   override def setInputStream(in: InputStream): Unit = this.in = in
   override def setExitCallback(callback: ExitCallback): Unit = this.callback = callback
   override def start(env: Environment): Unit = {
-    execute()
+    val exitCode = execute()
     out.flush()
 
     in.close()
     out.close()
     err.close()
 
-    callback.onExit(0)
+    callback.onExit(exitCode)
   }
   override def destroy(): Unit = {}
-  protected def execute(): Unit
+  protected def execute(): Int
 }

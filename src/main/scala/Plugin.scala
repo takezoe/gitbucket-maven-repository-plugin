@@ -1,10 +1,13 @@
-import java.io.File
+import java.io.{File, IOException, OutputStream}
+import java.nio.file.{Files, OpenOption, Path}
 
 import gitbucket.core.util.Directory
 import io.github.gitbucket.registry._
 import io.github.gitbucket.registry.command.{LsCommand, MkdirCommand}
 import io.github.gitbucket.registry.controller.RegistryController
 import io.github.gitbucket.solidbase.model.Version
+import org.apache.sshd.common.scp.helpers.DefaultScpFileOpener
+import org.apache.sshd.common.session.Session
 import org.apache.sshd.server.scp.ScpCommand
 
 class Plugin extends gitbucket.core.plugin.Plugin {
@@ -29,10 +32,15 @@ class Plugin extends gitbucket.core.plugin.Plugin {
 
       val fullPath = s"${Directory.GitBucketHome}/registries/${path}"
 
-      // TODO check overritable here?
-
       if(command.startsWith("scp")){
-        new ScpCommand(s"scp -t -d ${fullPath}", null, true, 1024 * 128, 1024 * 128, null, null)
+        new ScpCommand(s"scp -t -d ${fullPath}", null, true, 1024 * 128, 1024 * 128, new DefaultScpFileOpener(){
+          override def openWrite(session: Session, file: Path, options: OpenOption*): OutputStream = {
+            if(registry.overwrite == false && Files.exists(file)){
+              throw new IOException("Rejected.")
+            }
+            super.openWrite(session, file, options: _*)
+          }
+        }, null)
       } else if(command.startsWith("mkdir")){
         new MkdirCommand(new File(fullPath))
       } else {

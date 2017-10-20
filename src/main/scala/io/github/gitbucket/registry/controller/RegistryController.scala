@@ -1,15 +1,15 @@
-package io.github.gitbucket.librepo.controller
+package io.github.gitbucket.registry.controller
 
 import java.io.{File, FileInputStream}
 
-import io.github.gitbucket.librepo._
+import io.github.gitbucket.registry._
 import gitbucket.core.controller.ControllerBase
 import gitbucket.core.util.{Directory, FileUtil}
 import gitbucket.core.util.SyntaxSugars.using
 import org.apache.commons.io.IOUtils
 import org.scalatra.Ok
 
-class LibraryRepositoryController extends ControllerBase {
+class RegistryController extends ControllerBase {
 
   get("/repo/?"){
     Ok(<html>
@@ -19,7 +19,7 @@ class LibraryRepositoryController extends ControllerBase {
       <body>
         <h1>Library repositories</h1>
         <ul>
-          {Repositories.map { repo =>
+          {Registries.map { repo =>
             <li>
               <a href={context.baseUrl + "/repo/" + repo + "/"}>{repo}</a>
             </li>
@@ -37,7 +37,7 @@ class LibraryRepositoryController extends ControllerBase {
   get("/repo/:name/*"){
     val name = params("name")
 
-    if(Repositories.contains(name)){
+    if(Registries.contains(name)){
       val path = multiParams("splat").head
       val fullPath = s"${Directory.GitBucketHome}/librepo/${name}/${path}"
       val file = new File(fullPath)

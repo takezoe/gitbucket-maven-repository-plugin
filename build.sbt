@@ -1,4 +1,4 @@
-name := "gitbucket-librepo-plugin"
+name := "gitbucket-registry-plugin"
 
 organization := "io.github.gitbucket"
 

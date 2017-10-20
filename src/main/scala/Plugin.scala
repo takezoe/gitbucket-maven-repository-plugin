@@ -1,15 +1,15 @@
 import java.io.File
 
 import gitbucket.core.util.Directory
-import io.github.gitbucket.librepo._
-import io.github.gitbucket.librepo.controller.LibraryRepositoryController
+import io.github.gitbucket.registry._
+import io.github.gitbucket.registry.controller.RegistryController
 import io.github.gitbucket.solidbase.model.Version
 import org.apache.sshd.server.scp.ScpCommand
 
 class Plugin extends gitbucket.core.plugin.Plugin {
-  override val pluginId: String = "librepo"
-  override val pluginName: String = "Library Repository Plugin"
-  override val description: String = "Provides library management and repositories on GitBucket."
+  override val pluginId: String = "registry"
+  override val pluginName: String = "Library Registry Plugin"
+  override val description: String = "Provides library management and registries on GitBucket."
   override val versions: List[Version] = List(new Version("1.0.0"))
 
   override val sshCommandProviders = Seq({
@@ -17,7 +17,7 @@ class Plugin extends gitbucket.core.plugin.Plugin {
       println(command)
       val index = command.indexOf('/')
       val path = command.substring(index)
-      val fullPath = s"${Directory.GitBucketHome}/librepo/${path}"
+      val fullPath = s"${Directory.GitBucketHome}/registries/${path}"
       println(fullPath)
       val dir = new File(fullPath)
       if(!dir.exists){
@@ -31,11 +31,11 @@ class Plugin extends gitbucket.core.plugin.Plugin {
    * Check the existence of the library repository.
    */
   private def checkCommand(command: String): Boolean = {
-    Repositories.exists { repositoryName =>
+    Registries.exists { repositoryName =>
       command.startsWith(s"scp -t -d /${repositoryName}")
     }
   }
 
-  override val controllers = Seq("/repo/*" -> new LibraryRepositoryController())
+  override val controllers = Seq("/repo/*" -> new RegistryController())
 
 }

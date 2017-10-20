@@ -2,6 +2,7 @@ import java.io.File
 
 import gitbucket.core.util.Directory
 import io.github.gitbucket.registry._
+import io.github.gitbucket.registry.command.{LsCommand, MkdirCommand}
 import io.github.gitbucket.registry.controller.RegistryController
 import io.github.gitbucket.solidbase.model.Version
 import org.apache.sshd.server.scp.ScpCommand
@@ -14,16 +15,29 @@ class Plugin extends gitbucket.core.plugin.Plugin {
 
   override val sshCommandProviders = Seq({
     case command: String if checkCommand(command) => {
-      println(command)
       val index = command.indexOf('/')
-      val path = command.substring(index)
-      val fullPath = s"${Directory.GitBucketHome}/registries/${path}"
-      println(fullPath)
-      val dir = new File(fullPath)
-      if(!dir.exists){
-        dir.mkdirs()
+      val path = command.substring(index + 1)
+
+      val registryName = path.split("/")(1)
+      val registry = Registries.find(_.name == registryName).get
+
+      val registryPath = s"${Directory.GitBucketHome}/registries/${registry.name}"
+      val registryDir = new File(registryPath)
+      if(!registryDir.exists){
+        registryDir.mkdirs()
       }
-      new ScpCommand(s"scp -t ${fullPath}", null, true, 1024 * 128, 1024 * 128, null, null)
+
+      val fullPath = s"${Directory.GitBucketHome}/registries/${path}"
+
+      // TODO check overritable here?
+
+      if(command.startsWith("scp")){
+        new ScpCommand(s"scp -t -d ${fullPath}", null, true, 1024 * 128, 1024 * 128, null, null)
+      } else if(command.startsWith("mkdir")){
+        new MkdirCommand(new File(fullPath))
+      } else {
+        new LsCommand(new File(fullPath))
+      }
     }
   })
 
@@ -31,8 +45,11 @@ class Plugin extends gitbucket.core.plugin.Plugin {
    * Check the existence of the library repository.
    */
   private def checkCommand(command: String): Boolean = {
-    Registries.exists { repositoryName =>
-      command.startsWith(s"scp -t -d /${repositoryName}")
+    println(command)
+    Registries.exists { registry =>
+      command.startsWith(s"scp -t -d /repo/${registry.name}") ||
+      command.startsWith(s"ls /repo/${registry.name}") ||
+      command.startsWith(s"mkdir /repo/${registry.name}")
     }
   }
 

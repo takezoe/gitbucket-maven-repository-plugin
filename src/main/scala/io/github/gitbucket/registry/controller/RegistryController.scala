@@ -19,9 +19,9 @@ class RegistryController extends ControllerBase {
       <body>
         <h1>Library repositories</h1>
         <ul>
-          {Registries.map { repo =>
+          {Registries.map { registory =>
             <li>
-              <a href={context.baseUrl + "/repo/" + repo + "/"}>{repo}</a>
+              <a href={context.baseUrl + "/repo/" + registory.name + "/"}>{registory.name}</a>
             </li>
           }}
         </ul>

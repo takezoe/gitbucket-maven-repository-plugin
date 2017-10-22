@@ -1,7 +1,6 @@
 import java.io.{File, IOException, OutputStream}
 import java.nio.file.{Files, OpenOption, Path}
 
-import gitbucket.core.util.Directory
 import io.github.gitbucket.registry._
 import io.github.gitbucket.registry.command.{LsCommand, MkdirCommand}
 import io.github.gitbucket.registry.controller.RegistryController
@@ -24,13 +23,13 @@ class Plugin extends gitbucket.core.plugin.Plugin {
       val registryName = path.split("/")(1)
       val registry = Registries.find(_.name == registryName).get
 
-      val registryPath = s"${Directory.GitBucketHome}/registries/${registry.name}"
+      val registryPath = s"${RegistryPath}/${registry.name}"
       val registryDir = new File(registryPath)
       if(!registryDir.exists){
         registryDir.mkdirs()
       }
 
-      val fullPath = s"${Directory.GitBucketHome}/registries/${path}"
+      val fullPath = s"${RegistryPath}/${path}"
 
       if(command.startsWith("scp")){
         new ScpCommand(s"scp -t -d ${fullPath}", null, true, 1024 * 128, 1024 * 128, new DefaultScpFileOpener(){

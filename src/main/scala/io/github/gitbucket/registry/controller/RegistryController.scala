@@ -1,11 +1,13 @@
 package io.github.gitbucket.registry.controller
 
 import java.io.{File, FileInputStream}
+import javax.servlet.http.{HttpServletRequest, HttpServletRequestWrapper}
 
 import io.github.gitbucket.registry._
 import gitbucket.core.controller.ControllerBase
-import gitbucket.core.util.{Directory, FileUtil}
+import gitbucket.core.util.FileUtil
 import gitbucket.core.util.SyntaxSugars.using
+import net.sf.webdav.{LocalFileSystemStore, WebDavServletBean}
 import org.apache.commons.io.IOUtils
 import org.scalatra.Ok
 
@@ -39,7 +41,7 @@ class RegistryController extends ControllerBase {
 
     if(Registries.contains(name)){
       val path = multiParams("splat").head
-      val fullPath = s"${Directory.GitBucketHome}/librepo/${name}/${path}"
+      val fullPath = s"${RegistryPath}/${name}/${path}"
       val file = new File(fullPath)
 
       file match {
@@ -92,4 +94,22 @@ class RegistryController extends ControllerBase {
     } else NotFound()
   }
 
+  put("/repo/:name/*"){
+    val name = params("name")
+    val path = multiParams("splat").head
+
+    // TODO permission check
+
+    val webdav = new WebDavServletBean()
+    webdav.init(new LocalFileSystemStore(new File(s"${RegistryPath}/${name}")), null, null, -1, true)
+
+    webdav.service(new WebDavRequest(request, "/" + path), response)
+  }
+}
+
+/**
+ * Wraps HttpServletRequest to overwrite pathInfo.
+ */
+class WebDavRequest(request: HttpServletRequest, uri: String) extends HttpServletRequestWrapper(request) {
+  override def getPathInfo(): String = uri
 }

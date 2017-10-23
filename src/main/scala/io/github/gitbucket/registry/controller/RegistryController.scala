@@ -1,17 +1,19 @@
 package io.github.gitbucket.registry.controller
 
 import java.io.{File, FileInputStream}
-import javax.servlet.http.{HttpServletRequest, HttpServletRequestWrapper}
+import javax.servlet.http.{HttpServletRequest, HttpServletRequestWrapper, HttpServletResponse}
 
 import io.github.gitbucket.registry._
 import gitbucket.core.controller.ControllerBase
-import gitbucket.core.util.FileUtil
+import gitbucket.core.service.AccountService
+import gitbucket.core.util.{AuthUtil, FileUtil}
 import gitbucket.core.util.SyntaxSugars.using
+import gitbucket.core.util.Implicits._
 import net.sf.webdav.{LocalFileSystemStore, WebDavServletBean}
 import org.apache.commons.io.IOUtils
 import org.scalatra.Ok
 
-class RegistryController extends ControllerBase {
+class RegistryController extends ControllerBase with AccountService {
 
   get("/repo/?"){
     Ok(<html>
@@ -95,15 +97,31 @@ class RegistryController extends ControllerBase {
   }
 
   put("/repo/:name/*"){
-    val name = params("name")
-    val path = multiParams("splat").head
+    // Basic authentication
+    val loginAccount = request.header("Authorization").flatMap {
+      case auth if auth.startsWith("Basic ") => {
+        val Array(username, password) = AuthUtil.decodeAuthHeader(auth).split(":", 2)
+        authenticate(context.settings, username, password)
+      }
+      case _ => None
+    }
 
-    // TODO permission check
+    loginAccount match {
+      case Some(_) => {
+        val name = params("name")
+        val path = multiParams("splat").head
 
-    val webdav = new WebDavServletBean()
-    webdav.init(new LocalFileSystemStore(new File(s"${RegistryPath}/${name}")), null, null, -1, true)
+        // TODO overwrite check
 
-    webdav.service(new WebDavRequest(request, "/" + path), response)
+        val webdav = new WebDavServletBean()
+        webdav.init(new LocalFileSystemStore(new File(s"${RegistryPath}/${name}")), null, null, -1, true)
+        webdav.service(new WebDavRequest(request, "/" + path), response)
+      }
+      case None => {
+        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED)
+        response.setHeader("WWW-Authenticate", "Basic realm=\"GitBucket WebDAV registry\"")
+      }
+    }
   }
 }
 

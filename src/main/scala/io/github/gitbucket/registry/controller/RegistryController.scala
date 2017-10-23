@@ -1,7 +1,7 @@
 package io.github.gitbucket.registry.controller
 
-import java.io.{File, FileInputStream}
-import javax.servlet.http.{HttpServletRequest, HttpServletRequestWrapper, HttpServletResponse}
+import java.io.{File, FileInputStream, FileOutputStream}
+import javax.servlet.http.HttpServletResponse
 
 import io.github.gitbucket.registry._
 import gitbucket.core.controller.ControllerBase
@@ -9,7 +9,6 @@ import gitbucket.core.service.AccountService
 import gitbucket.core.util.{AuthUtil, FileUtil}
 import gitbucket.core.util.SyntaxSugars.using
 import gitbucket.core.util.Implicits._
-import net.sf.webdav.{LocalFileSystemStore, WebDavServletBean}
 import org.apache.commons.io.IOUtils
 import org.scalatra.Ok
 
@@ -116,24 +115,22 @@ class RegistryController extends ControllerBase with AccountService {
                   }
       // Overwrite check
       path     = multiParams("splat").head
-      fullPath = s"${RegistryPath}/${name}/${path}"
-      _        <- if(registry.overwrite == false && new File(fullPath).exists){
+      file     = new File(s"${RegistryPath}/${name}/${path}")
+      _        <- if(registry.overwrite == false && file.exists){
                     response.setStatus(HttpServletResponse.SC_NOT_ACCEPTABLE)
                     Left()
                   } else {
                     Right()
                   }
     } yield {
-      val webdav = new WebDavServletBean()
-      webdav.init(new LocalFileSystemStore(new File(s"${RegistryPath}/${name}")), null, null, -1, true)
-      webdav.service(new WebDavRequest(request, "/" + path), response)
+      val parent = file.getParentFile
+      if(!parent.exists){
+        parent.mkdirs()
+      }
+      using(new FileOutputStream(file)){ out =>
+        IOUtils.copy(request.getInputStream, out)
+      }
+      Ok()
     }
   }
-}
-
-/**
- * Wraps HttpServletRequest to overwrite pathInfo.
- */
-class WebDavRequest(request: HttpServletRequest, uri: String) extends HttpServletRequestWrapper(request) {
-  override def getPathInfo(): String = uri
 }

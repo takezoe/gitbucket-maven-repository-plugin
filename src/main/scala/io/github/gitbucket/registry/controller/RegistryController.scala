@@ -97,30 +97,36 @@ class RegistryController extends ControllerBase with AccountService {
   }
 
   put("/repo/:name/*"){
-    // Basic authentication
-    val loginAccount = request.header("Authorization").flatMap {
-      case auth if auth.startsWith("Basic ") => {
-        val Array(username, password) = AuthUtil.decodeAuthHeader(auth).split(":", 2)
-        authenticate(context.settings, username, password)
-      }
-      case _ => None
-    }
-
-    loginAccount match {
-      case Some(_) => {
-        val name = params("name")
-        val path = multiParams("splat").head
-
-        // TODO overwrite check
-
-        val webdav = new WebDavServletBean()
-        webdav.init(new LocalFileSystemStore(new File(s"${RegistryPath}/${name}")), null, null, -1, true)
-        webdav.service(new WebDavRequest(request, "/" + path), response)
-      }
-      case None => {
-        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED)
-        response.setHeader("WWW-Authenticate", "Basic realm=\"GitBucket WebDAV registry\"")
-      }
+    for {
+      // Basic authentication
+      _        <- request.header("Authorization").flatMap {
+                    case auth if auth.startsWith("Basic ") => {
+                      val Array(username, password) = AuthUtil.decodeAuthHeader(auth).split(":", 2)
+                      authenticate(context.settings, username, password)
+                    }
+                    case _ => None
+                  }.toRight {
+                    response.setStatus(HttpServletResponse.SC_UNAUTHORIZED)
+                    response.setHeader("WWW-Authenticate", "Basic realm=\"GitBucket WebDAV registry\"")
+                  }
+      // Find registry
+      name     = params("name")
+      registry <- Registries.find(_.name == name).toRight {
+                    response.setStatus(HttpServletResponse.SC_NOT_FOUND)
+                  }
+      // Overwrite check
+      path     = multiParams("splat").head
+      fullPath = s"${RegistryPath}/${name}/${path}"
+      _        <- if(registry.overwrite == false && new File(fullPath).exists){
+                    response.setStatus(HttpServletResponse.SC_NOT_ACCEPTABLE)
+                    Left()
+                  } else {
+                    Right()
+                  }
+    } yield {
+      val webdav = new WebDavServletBean()
+      webdav.init(new LocalFileSystemStore(new File(s"${RegistryPath}/${name}")), null, null, -1, true)
+      webdav.service(new WebDavRequest(request, "/" + path), response)
     }
   }
 }

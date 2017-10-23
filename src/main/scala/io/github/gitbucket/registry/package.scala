@@ -8,7 +8,8 @@ package object registry {
 
   val RegistryPath = s"${Directory.GitBucketHome}/registries"
 
+  case class Registry(name: String, overwrite: Boolean)
+
 }
 
 
-case class Registry(name: String, overwrite: Boolean)

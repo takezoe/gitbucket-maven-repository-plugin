@@ -13,3 +13,5 @@ libraryDependencies ++= Seq(
 
 resolvers += Resolver.bintrayRepo("bkromhout", "maven")
 resolvers += Resolver.mavenLocal
+
+enablePlugins(SbtTwirl)

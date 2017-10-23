@@ -1,9 +1,11 @@
 import java.io.{File, IOException, OutputStream}
 import java.nio.file.{Files, OpenOption, Path}
 
+import gitbucket.core.controller.Context
+import gitbucket.core.plugin.Link
 import io.github.gitbucket.registry._
 import io.github.gitbucket.registry.command.{LsCommand, MkdirCommand}
-import io.github.gitbucket.registry.controller.RegistryController
+import io.github.gitbucket.registry.controller.{RegistryAdminController, RegistryController}
 import io.github.gitbucket.solidbase.model.Version
 import org.apache.sshd.common.scp.helpers.DefaultScpFileOpener
 import org.apache.sshd.common.session.Session
@@ -60,6 +62,13 @@ class Plugin extends gitbucket.core.plugin.Plugin {
     }
   }
 
-  override val controllers = Seq("/repo/*" -> new RegistryController())
+  override val controllers = Seq(
+    "/repo/*"       -> new RegistryController(),
+    "/admin/repo/*" -> new RegistryAdminController()
+  )
+
+  override val systemSettingMenus = Seq(
+    (ctx: Context) => Some(Link("registries", "Registries", "admin/repo", Some("package")))
+  )
 
 }

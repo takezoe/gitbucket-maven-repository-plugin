@@ -43,7 +43,7 @@ publishTo := {
   else                                    Some("releases"  at base + "releases")
 }
 
-credentials += Credentials("GitBucket Maven Repository", "localhost", "root", "root")
+credentials += Credentials("GitBucket Maven Repository", "localhost", "username", "password")
 ```
 
 Publish via SSH:

@@ -18,7 +18,7 @@ class Plugin extends gitbucket.core.plugin.Plugin {
   override val sshCommandProviders = Seq({
     case command: String if checkCommand(command) => {
       val index = command.indexOf('/')
-      val path = command.substring(index + 1)
+      val path = command.substring(index + "/maven".length)
 
       val registryName = path.split("/")(1)
       val registry = Registries.find(_.name == registryName).get
@@ -53,7 +53,7 @@ class Plugin extends gitbucket.core.plugin.Plugin {
    */
   private def checkCommand(command: String): Boolean = {
     Registries.exists { registry =>
-      command.startsWith(s"scp -t -d /maven/${registry.name}") ||
+      command.matches(s"scp .* /maven/${registry.name}/.*") ||
       command.startsWith(s"ls /maven/${registry.name}") ||
       command.startsWith(s"mkdir /maven/${registry.name}")
     }

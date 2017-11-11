@@ -24,7 +24,7 @@ class MavenRepositoryController extends ControllerBase with AccountService {
         <ul>
           {Registries.map { registory =>
             <li>
-              <a href={context.baseUrl + "/repositories/" + registory.name + "/"}>{registory.name}</a>
+              <a href={context.baseUrl + "/maven/" + registory.name + "/"}>{registory.name}</a>
             </li>
           }}
         </ul>
@@ -34,13 +34,13 @@ class MavenRepositoryController extends ControllerBase with AccountService {
 
   get("/maven/:name"){
     val name = params("name")
-    redirect(s"/repositories/${name}/")
+    redirect(s"/maven/${name}/")
   }
 
   get("/maven/:name/*"){
     val name = params("name")
 
-    if(Registries.contains(name)){
+    if(Registries.exists(_.name == name)){
       val path = multiParams("splat").head
       val fullPath = s"${RegistryPath}/${name}/${path}"
       val file = new File(fullPath)
@@ -106,7 +106,7 @@ class MavenRepositoryController extends ControllerBase with AccountService {
              case _ => None
            }.toRight {
              response.setStatus(HttpServletResponse.SC_UNAUTHORIZED)
-             response.setHeader("WWW-Authenticate", "Basic realm=\"GitBucket WebDAV registry\"")
+             response.setHeader("WWW-Authenticate", "Basic realm=\"GitBucket Maven Repository\"")
            }
       // Find registry
       name = params("name")

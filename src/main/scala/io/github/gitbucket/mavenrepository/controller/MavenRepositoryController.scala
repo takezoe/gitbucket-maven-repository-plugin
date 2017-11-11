@@ -1,9 +1,9 @@
-package io.github.gitbucket.registry.controller
+package io.github.gitbucket.mavenrepository.controller
 
 import java.io.{File, FileInputStream, FileOutputStream}
 import javax.servlet.http.HttpServletResponse
 
-import io.github.gitbucket.registry._
+import io.github.gitbucket.mavenrepository._
 import gitbucket.core.controller.ControllerBase
 import gitbucket.core.service.AccountService
 import gitbucket.core.util.{AuthUtil, FileUtil}
@@ -12,9 +12,9 @@ import gitbucket.core.util.Implicits._
 import org.apache.commons.io.IOUtils
 import org.scalatra.Ok
 
-class RegistryController extends ControllerBase with AccountService {
+class MavenRepositoryController extends ControllerBase with AccountService {
 
-  get("/repo/?"){
+  get("/maven/?"){
     Ok(<html>
       <head>
         <title>Available repositories</title>
@@ -24,7 +24,7 @@ class RegistryController extends ControllerBase with AccountService {
         <ul>
           {Registries.map { registory =>
             <li>
-              <a href={context.baseUrl + "/repo/" + registory.name + "/"}>{registory.name}</a>
+              <a href={context.baseUrl + "/repositories/" + registory.name + "/"}>{registory.name}</a>
             </li>
           }}
         </ul>
@@ -32,12 +32,12 @@ class RegistryController extends ControllerBase with AccountService {
     </html>)
   }
 
-  get("/repo/:name"){
+  get("/maven/:name"){
     val name = params("name")
-    redirect(s"/repo/${name}/")
+    redirect(s"/repositories/${name}/")
   }
 
-  get("/repo/:name/*"){
+  get("/maven/:name/*"){
     val name = params("name")
 
     if(Registries.contains(name)){
@@ -56,7 +56,7 @@ class RegistryController extends ControllerBase with AccountService {
 
         // Redirect to the normalized url for the directory
         case f if f.exists && f.isDirectory && path.nonEmpty && !path.endsWith("/") =>
-          redirect(s"/repo/${name}/${path}/")
+          redirect(s"/maven/${name}/${path}/")
 
         // Render the directory index
         case f if f.exists && f.isDirectory =>
@@ -79,9 +79,9 @@ class RegistryController extends ControllerBase with AccountService {
                 {files.map { file =>
                   <li>
                     {if(file.isDirectory) {
-                      <a href={context.baseUrl + "/repo/" + name + "/" + path + file.getName + "/"}>{file.getName}/</a>
+                      <a href={context.baseUrl + "/maven/" + name + "/" + path + file.getName + "/"}>{file.getName}/</a>
                     } else {
-                      <a href={context.baseUrl + "/repo/" + name + "/" + path + file.getName}>{file.getName}</a>
+                      <a href={context.baseUrl + "/maven/" + name + "/" + path + file.getName}>{file.getName}</a>
                     }}
                   </li>
                 }}
@@ -95,33 +95,33 @@ class RegistryController extends ControllerBase with AccountService {
     } else NotFound()
   }
 
-  put("/repo/:name/*"){
+  put("/maven/:name/*"){
     for {
       // Basic authentication
-      _        <- request.header("Authorization").flatMap {
-                    case auth if auth.startsWith("Basic ") => {
-                      val Array(username, password) = AuthUtil.decodeAuthHeader(auth).split(":", 2)
-                      authenticate(context.settings, username, password)
-                    }
-                    case _ => None
-                  }.toRight {
-                    response.setStatus(HttpServletResponse.SC_UNAUTHORIZED)
-                    response.setHeader("WWW-Authenticate", "Basic realm=\"GitBucket WebDAV registry\"")
-                  }
+      _ <- request.header("Authorization").flatMap {
+             case auth if auth.startsWith("Basic ") => {
+               val Array(username, password) = AuthUtil.decodeAuthHeader(auth).split(":", 2)
+               authenticate(context.settings, username, password)
+             }
+             case _ => None
+           }.toRight {
+             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED)
+             response.setHeader("WWW-Authenticate", "Basic realm=\"GitBucket WebDAV registry\"")
+           }
       // Find registry
-      name     = params("name")
+      name = params("name")
       registry <- Registries.find(_.name == name).toRight {
                     response.setStatus(HttpServletResponse.SC_NOT_FOUND)
                   }
       // Overwrite check
-      path     = multiParams("splat").head
-      file     = new File(s"${RegistryPath}/${name}/${path}")
-      _        <- if(registry.overwrite == false && file.exists){
-                    response.setStatus(HttpServletResponse.SC_NOT_ACCEPTABLE)
-                    Left()
-                  } else {
-                    Right()
-                  }
+      path = multiParams("splat").head
+      file = new File(s"${RegistryPath}/${name}/${path}")
+      _    <- if(registry.overwrite == false && file.exists){
+                response.setStatus(HttpServletResponse.SC_NOT_ACCEPTABLE)
+                Left(())
+              } else {
+                Right(())
+              }
     } yield {
       val parent = file.getParentFile
       if(!parent.exists){

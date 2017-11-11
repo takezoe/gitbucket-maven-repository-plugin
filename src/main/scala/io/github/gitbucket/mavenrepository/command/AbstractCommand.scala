@@ -1,4 +1,4 @@
-package io.github.gitbucket.registry.command
+package io.github.gitbucket.mavenrepository.command
 
 import java.io.{InputStream, OutputStream}
 

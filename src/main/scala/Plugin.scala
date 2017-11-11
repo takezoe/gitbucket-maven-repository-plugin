@@ -1,20 +1,18 @@
 import java.io.{File, IOException, OutputStream}
 import java.nio.file.{Files, OpenOption, Path}
 
-import gitbucket.core.controller.Context
-import gitbucket.core.plugin.Link
-import io.github.gitbucket.registry._
-import io.github.gitbucket.registry.command.{LsCommand, MkdirCommand}
-import io.github.gitbucket.registry.controller.{RegistryAdminController, RegistryController}
+import io.github.gitbucket.mavenrepository._
+import io.github.gitbucket.mavenrepository.command.{LsCommand, MkdirCommand}
+import io.github.gitbucket.mavenrepository.controller.MavenRepositoryController
 import io.github.gitbucket.solidbase.model.Version
 import org.apache.sshd.common.scp.helpers.DefaultScpFileOpener
 import org.apache.sshd.common.session.Session
 import org.apache.sshd.server.scp.ScpCommand
 
 class Plugin extends gitbucket.core.plugin.Plugin {
-  override val pluginId: String = "registry"
-  override val pluginName: String = "Library Registry Plugin"
-  override val description: String = "Provides library management and registries on GitBucket."
+  override val pluginId: String = "maven-repository"
+  override val pluginName: String = "Maven Repository Plugin"
+  override val description: String = "Host Maven repository on GitBucket."
   override val versions: List[Version] = List(new Version("1.0.0"))
 
   override val sshCommandProviders = Seq({
@@ -54,21 +52,15 @@ class Plugin extends gitbucket.core.plugin.Plugin {
    * Check the existence of the library repository.
    */
   private def checkCommand(command: String): Boolean = {
-    println(command)
     Registries.exists { registry =>
-      command.startsWith(s"scp -t -d /repo/${registry.name}") ||
-      command.startsWith(s"ls /repo/${registry.name}") ||
-      command.startsWith(s"mkdir /repo/${registry.name}")
+      command.startsWith(s"scp -t -d /maven/${registry.name}") ||
+      command.startsWith(s"ls /maven/${registry.name}") ||
+      command.startsWith(s"mkdir /maven/${registry.name}")
     }
   }
 
   override val controllers = Seq(
-    "/repo/*"       -> new RegistryController(),
-    "/admin/repo/*" -> new RegistryAdminController()
-  )
-
-  override val systemSettingMenus = Seq(
-    (ctx: Context) => Some(Link("registries", "Registries", "admin/repo", Some("package")))
+    "/maven/*" -> new MavenRepositoryController()
   )
 
 }

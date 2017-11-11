@@ -17,6 +17,12 @@ You can also deploy via SSH (SCP) with public key authentication using keys regi
 - Port: SSH port configured in GitBucket system settings
 - Path: `/maven/releases` or `/maven/snapshots`
 
+## Compatibility
+
+Plugin version | GitBucket version
+:--------------|:--------------------
+1.0.x -        | 4.19.x -
+
 ## Installation
 
 Run `sbt package` and copy generated `/target/scala-2.12/gitbucket-maven-repository-plugin_2.12-1.0.0.jar` to `~/.gitbucket/plugins/` (If the directory does not exist, create it by hand before copying the jar).

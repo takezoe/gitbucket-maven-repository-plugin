@@ -116,7 +116,9 @@ class MavenRepositoryController extends ControllerBase with AccountService {
       // Overwrite check
       path = multiParams("splat").head
       file = new File(s"${RegistryPath}/${name}/${path}")
-      _    <- if(registry.overwrite == false && file.exists){
+      _    <- if(file.getName == "maven-metadata.xml" || file.getName.startsWith("maven-metadata.xml.")){
+                Right(())
+              } else if(registry.overwrite == false && file.exists){
                 response.setStatus(HttpServletResponse.SC_NOT_ACCEPTABLE)
                 Left(())
               } else {

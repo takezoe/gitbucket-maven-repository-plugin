@@ -69,25 +69,27 @@ publishTo := {
 Add distribution settings to your `pom.xml`:
 
 ```xml
-<distributionManagement>
-  <repository>
-    <id>gitbucket-maven-repository-releases</id>
-    <url>http://localhost:8080/maven/releases</url>
-  </repository>
-  <snapshotRepository>
-    <id>gitbucket-maven-repository-snapshots</id>
-    <url>http://localhost:8080/maven/snapshots</url>
-  </snapshotRepository>
-</distributionManagement>
+<project>
+  ...
+  <distributionManagement>
+    <repository>
+      <id>gitbucket-maven-repository-releases</id>
+      <url>http://localhost:8080/maven/releases</url>
+    </repository>
+    <snapshotRepository>
+      <id>gitbucket-maven-repository-snapshots</id>
+      <url>http://localhost:8080/maven/snapshots</url>
+    </snapshotRepository>
+  </distributionManagement>
+  ...
+</project>
 ```
 
 Also you need to add authentication settings in `~/.m2/settings.xml` (replace username and password with your GitBucket account's one):
 
 ```xml
-<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
-  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-  xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0
-                      http://maven.apache.org/xsd/settings-1.0.0.xsd">
+<settings>
+  ...
   <servers>
     <server>
       <id>gitbucket-maven-repository-releases</id>
@@ -100,5 +102,6 @@ Also you need to add authentication settings in `~/.m2/settings.xml` (replace us
       <password>root</password>
     </server>
   </servers>
+   ...
 </settings>
 ```

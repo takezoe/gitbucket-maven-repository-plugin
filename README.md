@@ -70,4 +70,42 @@ publishTo := {
 
 ### Maven
 
-TBC
+Add distribution settings to your `pom.xml`:
+
+```xml
+<project>
+  ...
+  <distributionManagement>
+    <repository>
+      <id>gitbucket-maven-repository-releases</id>
+      <url>http://localhost:8080/maven/releases</url>
+    </repository>
+    <snapshotRepository>
+      <id>gitbucket-maven-repository-snapshots</id>
+      <url>http://localhost:8080/maven/snapshots</url>
+    </snapshotRepository>
+  </distributionManagement>
+  ...
+</project>
+```
+
+Also you need to add authentication settings in `~/.m2/settings.xml` (replace username and password with your GitBucket account's one):
+
+```xml
+<settings>
+  ...
+  <servers>
+    <server>
+      <id>gitbucket-maven-repository-releases</id>
+      <username>root</username>
+      <password>root</password>
+    </server>
+    <server>
+      <id>gitbucket-maven-repository-snapshots</id>
+      <username>root</username>
+      <password>root</password>
+    </server>
+  </servers>
+   ...
+</settings>
+```

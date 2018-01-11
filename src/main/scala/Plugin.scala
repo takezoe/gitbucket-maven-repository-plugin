@@ -34,7 +34,10 @@ class Plugin extends gitbucket.core.plugin.Plugin {
       if(command.startsWith("scp")){
         new ScpCommand(s"scp -t -d ${fullPath}", null, true, 1024 * 128, 1024 * 128, new DefaultScpFileOpener(){
           override def openWrite(session: Session, file: Path, options: OpenOption*): OutputStream = {
-            if(registry.overwrite == false && Files.exists(file)){
+            val fileName = file.getFileName.toString
+            if(fileName == "maven-metadata.xml" || fileName.startsWith("maven-metadata.xml.")){
+              // accept
+            } else if(registry.overwrite == false && Files.exists(file)){
               throw new IOException("Rejected.")
             }
             super.openWrite(session, file, options: _*)

@@ -9,13 +9,14 @@ import gitbucket.core.service.AccountService
 import gitbucket.core.util.{AuthUtil, FileUtil}
 import gitbucket.core.util.SyntaxSugars.using
 import gitbucket.core.util.Implicits._
+import io.github.gitbucket.mavenrepository.service.MavenRepositoryService
 import org.apache.commons.io.IOUtils
 import org.scalatra.{ActionResult, NotAcceptable, Ok}
 
-class MavenRepositoryController extends ControllerBase with AccountService {
+class MavenRepositoryController extends ControllerBase with AccountService with MavenRepositoryService {
 
   get("/admin/maven"){
-    gitbucket.mavenrepository.html.settings(Registries)
+    gitbucket.mavenrepository.html.settings(getMavenRepositories())
   }
 
   get("/maven/?"){
@@ -26,7 +27,7 @@ class MavenRepositoryController extends ControllerBase with AccountService {
       <body>
         <h1>Library repositories</h1>
         <ul>
-          {Registries.map { registory =>
+          {getMavenRepositories().map { registory =>
             <li>
               <a href={context.baseUrl + "/maven/" + registory.name + "/"}>{registory.name}</a>
             </li>
@@ -60,7 +61,7 @@ class MavenRepositoryController extends ControllerBase with AccountService {
       _ <- basicAuthentication()
       // Find registry
       name = params("name")
-      _ <- Registries.find(_.name == name).toRight { NotFound() }
+      _ <- getMavenRepositories().find(_.name == name).toRight { NotFound() }
       path = multiParams("splat").head
       file = new File(s"${RegistryPath}/${name}/${path}")
     } yield {
@@ -125,7 +126,7 @@ class MavenRepositoryController extends ControllerBase with AccountService {
       _ <- basicAuthentication()
       // Find registry
       name = params("name")
-      registry <- Registries.find(_.name == name).toRight { NotFound() }
+      registry <- getMavenRepositories().find(_.name == name).toRight { NotFound() }
       // Overwrite check
       path = multiParams("splat").head
       file = new File(s"${RegistryPath}/${name}/${path}")

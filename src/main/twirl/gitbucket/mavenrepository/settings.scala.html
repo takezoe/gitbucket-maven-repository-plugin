@@ -1,4 +1,4 @@
-@(repositries: Seq[io.github.gitbucket.mavenrepository.Registry])(implicit context: gitbucket.core.controller.Context)
+@(repositries: Seq[io.github.gitbucket.mavenrepository.model.Registry])(implicit context: gitbucket.core.controller.Context)
 @gitbucket.core.html.main("Maven repositories") {
   @gitbucket.core.admin.html.menu("maven") {
     <div class="pull-right">

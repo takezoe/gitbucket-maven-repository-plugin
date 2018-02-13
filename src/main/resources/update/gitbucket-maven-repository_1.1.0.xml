@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<changeSet>
+  <createTable tableName="REGISTRY">
+    <column name="NAME" type="varchar(100)" nullable="false"/>
+    <column name="DESCRIPTION" type="text" nullable="true"/>
+    <column name="OVERWRITE" type="boolean" nullable="false"/>
+    <column name="PRIVATE" type="boolean" nullable="false"/>
+  </createTable>
+
+  <addPrimaryKey constraintName="IDX_REGISTRY_PK" tableName="REGISTRY" columnNames="NAME"/>
+
+  <insert tableName="REGISTRY">
+    <column name="NAME" value="releases"/>
+    <column name="FULL_NAME" value="GitBucket Releases"/>
+    <column name="OVERWRITE" valueBoolean="false"/>
+    <column name="PRIVATE" valueBoolean="false"/>
+  </insert>
+
+  <insert tableName="REGISTRY">
+    <column name="NAME" value="snapshots"/>
+    <column name="FULL_NAME" value="GitBucket Snapshots"/>
+    <column name="OVERWRITE" valueBoolean="true"/>
+    <column name="PRIVATE" valueBoolean="false"/>
+  </insert>
+</changeSet>

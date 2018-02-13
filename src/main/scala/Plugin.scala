@@ -6,6 +6,7 @@ import gitbucket.core.plugin.Link
 import io.github.gitbucket.mavenrepository._
 import io.github.gitbucket.mavenrepository.command.{LsCommand, MkdirCommand}
 import io.github.gitbucket.mavenrepository.controller.MavenRepositoryController
+import io.github.gitbucket.solidbase.migration.LiquibaseMigration
 import io.github.gitbucket.solidbase.model.Version
 import org.apache.sshd.common.scp.helpers.DefaultScpFileOpener
 import org.apache.sshd.common.session.Session
@@ -15,7 +16,13 @@ class Plugin extends gitbucket.core.plugin.Plugin {
   override val pluginId: String = "maven-repository"
   override val pluginName: String = "Maven Repository Plugin"
   override val description: String = "Host Maven repository on GitBucket."
-  override val versions: List[Version] = List(new Version("1.0.0"))
+  override val versions: List[Version] = List(
+    new Version("1.0.0"),
+    new Version("1.0.1"),
+    new Version("1.1.0",
+      new LiquibaseMigration("update/gitbucket-maven-repository_1.1.0.xml")
+    )
+  )
 
   override val sshCommandProviders = Seq({
     case command: String if checkCommand(command) => {

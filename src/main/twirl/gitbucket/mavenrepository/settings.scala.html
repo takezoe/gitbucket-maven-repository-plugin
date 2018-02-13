@@ -1,0 +1,30 @@
+@(repositries: Seq[io.github.gitbucket.mavenrepository.Registry])(implicit context: gitbucket.core.controller.Context)
+@gitbucket.core.html.main("Maven repositories") {
+  @gitbucket.core.admin.html.menu("maven") {
+    <div class="pull-right">
+      <a href="" class="btn btn-default">New maven repository</a>
+    </div>
+    <h1>Maven repositories</h1>
+    <table class="table table-bordered table-hover">
+      <tr>
+        <th width="200">Name</th>
+        <th>URL</th>
+        <th width="150">Overwrite</th>
+        <th width="150">Authentication</th>
+        <th width="120"></th>
+      </tr>
+    @repositries.map { repository =>
+      <tr>
+        <td>@repository.name</td>
+        <td><a href="@context.baseUrl/maven/@repository.name" target="_blank">@context.baseUrl/maven/@repository.name</a></td>
+        <td>@repository.overwrite</td>
+        <td>false</td>
+        <td>
+          <a href="" class="btn btn-default btn-sm">Edit</a>
+          <a href="" class="btn btn-danger btn-sm">Delete</a>
+        </td>
+      </tr>
+    }
+    </table>
+  }
+}

@@ -1,6 +1,8 @@
 import java.io.{File, IOException, OutputStream}
 import java.nio.file.{Files, OpenOption, Path}
 
+import gitbucket.core.controller.Context
+import gitbucket.core.plugin.Link
 import io.github.gitbucket.mavenrepository._
 import io.github.gitbucket.mavenrepository.command.{LsCommand, MkdirCommand}
 import io.github.gitbucket.mavenrepository.controller.MavenRepositoryController
@@ -62,8 +64,15 @@ class Plugin extends gitbucket.core.plugin.Plugin {
     }
   }
 
+  private val controller = new MavenRepositoryController()
+
   override val controllers = Seq(
-    "/maven/*" -> new MavenRepositoryController()
+    "/maven/*"       -> controller,
+    "/admin/maven/*" -> controller
+  )
+
+  override val systemSettingMenus: Seq[Context => Option[Link]] = Seq(
+    _ => Some(Link("maven", "Maven repositories", "admin/maven"))
   )
 
 }

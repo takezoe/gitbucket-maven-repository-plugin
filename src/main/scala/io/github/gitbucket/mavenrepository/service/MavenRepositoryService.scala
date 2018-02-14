@@ -14,7 +14,7 @@ trait MavenRepositoryService {
     Registries.sortBy(_.name).list
   }
 
-  def addRegistry(registry: Registry)(implicit s: Session): Unit = {
+  def createRegistry(registry: Registry)(implicit s: Session): Unit = {
     Registries.insert(registry)
 
     val dir = new File(s"${RegistryPath}/${registry.name}")

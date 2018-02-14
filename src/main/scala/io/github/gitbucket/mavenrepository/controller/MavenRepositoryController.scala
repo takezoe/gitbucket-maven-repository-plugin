@@ -9,11 +9,23 @@ import gitbucket.core.service.AccountService
 import gitbucket.core.util.{AuthUtil, FileUtil}
 import gitbucket.core.util.SyntaxSugars.using
 import gitbucket.core.util.Implicits._
+import io.github.gitbucket.mavenrepository.model.Registry
 import io.github.gitbucket.mavenrepository.service.MavenRepositoryService
 import org.apache.commons.io.IOUtils
+import org.scalatra.forms._
 import org.scalatra.{ActionResult, NotAcceptable, Ok}
 
 class MavenRepositoryController extends ControllerBase with AccountService with MavenRepositoryService {
+
+  case class RepositoryCreationForm(name: String, description: Option[String], overwrite: Boolean, isPrivate: Boolean)
+
+  val repositoryCreationForm = mapping(
+    "name"        -> trim(label("Name", text(required, maxlength(100)))), // TODO Identifier check and Unique check
+    "description" -> trim(label("Description", optional(text()))),
+    "overwrite"   -> trim(boolean()),
+    "isPrivate"   -> trim(boolean())
+  )(RepositoryCreationForm.apply)
+
 
   get("/admin/maven"){
     gitbucket.mavenrepository.html.settings(getMavenRepositories())
@@ -21,6 +33,11 @@ class MavenRepositoryController extends ControllerBase with AccountService with 
 
   get("/admin/maven/_new"){
     gitbucket.mavenrepository.html.form()
+  }
+
+  post("/admin/maven/_new", repositoryCreationForm){ form =>
+    createRegistry(Registry(form.name, form.description, form.overwrite, form.isPrivate))
+    redirect("/admin/maven")
   }
 
 

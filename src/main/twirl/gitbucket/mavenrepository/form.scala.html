@@ -2,14 +2,16 @@
 @gitbucket.core.html.main("Maven repositories") {
   @gitbucket.core.admin.html.menu("maven") {
     <h1>New Maven repository</h1>
-    <form>
+    <form method="POST" action="@context.path/admin/maven/_new" validate="true">
       <fieldset class="form-group">
         <label for="name">Repository name</label>
         <input type="text" id="name" name="name" class="form-control"/>
+        <span id="error-name" class="error"></span>
       </fieldset>
       <fieldset class="form-group">
         <label for="description">Description</label>
         <input type="text" id="description" name="description" class="form-control"/>
+        <span id="error-description" class="error"></span>
       </fieldset>
       <fieldset class="form-group">
         <label for="overwrite">

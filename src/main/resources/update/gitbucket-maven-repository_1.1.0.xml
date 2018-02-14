@@ -11,14 +11,14 @@
 
   <insert tableName="REGISTRY">
     <column name="NAME" value="releases"/>
-    <column name="FULL_NAME" value="GitBucket Releases"/>
+    <column name="DESCRIPTION" value="GitBucket Releases"/>
     <column name="OVERWRITE" valueBoolean="false"/>
     <column name="PRIVATE" valueBoolean="false"/>
   </insert>
 
   <insert tableName="REGISTRY">
     <column name="NAME" value="snapshots"/>
-    <column name="FULL_NAME" value="GitBucket Snapshots"/>
+    <column name="DESCRIPTION" value="GitBucket Snapshots"/>
     <column name="OVERWRITE" valueBoolean="true"/>
     <column name="PRIVATE" valueBoolean="false"/>
   </insert>

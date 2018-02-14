@@ -19,6 +19,11 @@ class MavenRepositoryController extends ControllerBase with AccountService with 
     gitbucket.mavenrepository.html.settings(getMavenRepositories())
   }
 
+  get("/admin/maven/_new"){
+    gitbucket.mavenrepository.html.form()
+  }
+
+
   get("/maven/?"){
     Ok(<html>
       <head>

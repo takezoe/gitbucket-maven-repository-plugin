@@ -1,0 +1,30 @@
+@()(implicit context: gitbucket.core.controller.Context)
+@gitbucket.core.html.main("Maven repositories") {
+  @gitbucket.core.admin.html.menu("maven") {
+    <h1>New Maven repository</h1>
+    <form>
+      <fieldset class="form-group">
+        <label for="name">Repository name</label>
+        <input type="text" id="name" name="name" class="form-control"/>
+      </fieldset>
+      <fieldset class="form-group">
+        <label for="description">Description</label>
+        <input type="text" id="description" name="description" class="form-control"/>
+      </fieldset>
+      <fieldset class="form-group">
+        <label for="overwrite">
+          <input type="checkbox" id="overwrite" name="overwrite"/> Allow overwrite
+        </label>
+      </fieldset>
+      <fieldset class="form-group">
+        <label for="isPrivate">
+          <input type="checkbox" id="isPrivate" name="isPrivate"/> Require Basic authentication
+        </label>
+      </fieldset>
+      <fieldset class="form-group">
+        <input type="submit" value="Create" class="btn btn-success"/>
+        <a href="@context.path/admin/maven" class="btn btn-default">Cancel</a>
+      </fieldset>
+    </form>
+  }
+}

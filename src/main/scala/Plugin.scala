@@ -1,5 +1,6 @@
 import java.io.{File, IOException, OutputStream}
 import java.nio.file.{Files, OpenOption, Path}
+import java.util
 
 import gitbucket.core.controller.Context
 import gitbucket.core.plugin.Link
@@ -9,7 +10,7 @@ import io.github.gitbucket.mavenrepository._
 import io.github.gitbucket.mavenrepository.command.{LsCommand, MkdirCommand}
 import io.github.gitbucket.mavenrepository.controller.MavenRepositoryController
 import io.github.gitbucket.mavenrepository.service.MavenRepositoryService
-import io.github.gitbucket.solidbase.migration.LiquibaseMigration
+import io.github.gitbucket.solidbase.migration.{LiquibaseMigration, Migration}
 import io.github.gitbucket.solidbase.model.Version
 import org.apache.sshd.common.scp.helpers.DefaultScpFileOpener
 import org.apache.sshd.common.session.Session
@@ -23,7 +24,11 @@ class Plugin extends gitbucket.core.plugin.Plugin with MavenRepositoryService {
     new Version("1.0.0"),
     new Version("1.0.1"),
     new Version("1.1.0",
-      new LiquibaseMigration("update/gitbucket-maven-repository_1.1.0.xml")
+      new LiquibaseMigration("update/gitbucket-maven-repository_1.1.0.xml"),
+      (moduleId: String, version: String, context: util.Map[String, AnyRef]) => {
+        new File(s"${RegistryPath}/releases").mkdirs()
+        new File(s"${RegistryPath}/snapshots").mkdirs()
+      }
     )
   )
 
@@ -38,10 +43,10 @@ class Plugin extends gitbucket.core.plugin.Plugin with MavenRepositoryService {
       }
 
       val registryPath = s"${RegistryPath}/${registry.name}"
-      val registryDir = new File(registryPath)
-      if(!registryDir.exists){
-        registryDir.mkdirs()
-      }
+//      val registryDir = new File(registryPath)
+//      if(!registryDir.exists){
+//        registryDir.mkdirs()
+//      }
 
       val fullPath = s"${RegistryPath}/${path}"
 

@@ -4,18 +4,24 @@ A GitBucket plugin that provides Maven repository hosting on GitBucket.
 
 ## Features
 
-Following Maven repositories become available by installing this plugin to GitBucket.
+In default, following Maven repositories become available by installing this plugin to GitBucket.
 
 - `http(s)://GITBUCKET_HOST/maven/releases`
 - `http(s)://GITBUCKET_HOST/maven/snapshots`
 
 You can deploy artifacts to these repositories via WebDAV with your GitBucket account.
-
-You can also deploy via SSH (SCP) with public key authentication using keys registered in GitBucket. In this case, use following configurations to connect via SSH:
+ 
+Also you can deploy via SSH (SCP) with public key authentication using keys registered in GitBucket. In this case, use following configurations to connect via SSH:
 
 - Host: Hostname of GitBucket
 - Port: SSH port configured in GitBucket system settings
 - Path: `/maven/releases` or `/maven/snapshots`
+
+It's possible to add more repositories and configure them at the administration console:
+
+![Maven repository settings](maven-repository-settings.png)
+
+You can specify whether artifacts are overwritable for each repository. In addition, it's possible to make repository private. Private repositories require basic authentication by GitBucket account to access.
 
 ## Compatibility
 

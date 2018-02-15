@@ -61,23 +61,23 @@ class MavenRepositoryController extends ControllerBase with AccountService with 
     redirect("/admin/maven")
   }
 
-  get("/maven/?"){
-    Ok(<html>
-      <head>
-        <title>Available repositories</title>
-      </head>
-      <body>
-        <h1>Library repositories</h1>
-        <ul>
-          {getMavenRepositories().map { registory =>
-            <li>
-              <a href={context.baseUrl + "/maven/" + registory.name + "/"}>{registory.name}</a>
-            </li>
-          }}
-        </ul>
-      </body>
-    </html>)
-  }
+//  get("/maven/?"){
+//    Ok(<html>
+//      <head>
+//        <title>Available repositories</title>
+//      </head>
+//      <body>
+//        <h1>Library repositories</h1>
+//        <ul>
+//          {getMavenRepositories().map { registory =>
+//            <li>
+//              <a href={context.baseUrl + "/maven/" + registory.name + "/"}>{registory.name}</a>
+//            </li>
+//          }}
+//        </ul>
+//      </body>
+//    </html>)
+//  }
 
   get("/maven/:name"){
     val name = params("name")
@@ -93,17 +93,18 @@ class MavenRepositoryController extends ControllerBase with AccountService with 
       case _ => None
     }.toRight {
       response.setHeader("WWW-Authenticate", "Basic realm=\"GitBucket Maven Repository\"")
-      Unauthorized()
+      org.scalatra.Unauthorized()
     }
   }
 
   get("/maven/:name/*"){
+    val name = params("name")
+
     val result = for {
-      // Basic authentication
-      _ <- basicAuthentication()
       // Find registry
-      name = params("name")
-      _ <- getMavenRepositories().find(_.name == name).toRight { NotFound() }
+      registry <- getMavenRepository(name).toRight { NotFound() }
+      // Basic authentication
+      _ <- if(registry.isPrivate){ basicAuthentication().map(x => Some(x)) } else Right(None)
       path = multiParams("splat").head
       file = new File(s"${RegistryPath}/${name}/${path}")
     } yield {
@@ -137,16 +138,18 @@ class MavenRepositoryController extends ControllerBase with AccountService with 
             <body>
               <h1>{name} - /{path}</h1>
               <ul>
-                <li><a href="../">../</a></li>
-                {files.map { file =>
-                <li>
-                  {if(file.isDirectory) {
-                  <a href={context.baseUrl + "/maven/" + name + "/" + path + file.getName + "/"}>{file.getName}/</a>
-                } else {
-                  <a href={context.baseUrl + "/maven/" + name + "/" + path + file.getName}>{file.getName}</a>
+                {if(path != ""){
+                  <li><a href="../">../</a></li>
                 }}
-                </li>
-              }}
+                {files.map { file =>
+                  <li>
+                  {if(file.isDirectory) {
+                    <a href={context.baseUrl + "/maven/" + name + "/" + path + file.getName + "/"}>{file.getName}/</a>
+                  } else {
+                    <a href={context.baseUrl + "/maven/" + name + "/" + path + file.getName}>{file.getName}</a>
+                  }}
+                  </li>
+                }}
               </ul>
             </body>
           </html>)
@@ -163,12 +166,13 @@ class MavenRepositoryController extends ControllerBase with AccountService with 
   }
 
   put("/maven/:name/*"){
+    val name = params("name")
+
     val result = for {
-      // Basic authentication
-      _ <- basicAuthentication()
       // Find registry
-      name = params("name")
-      registry <- getMavenRepositories().find(_.name == name).toRight { NotFound() }
+      registry <- getMavenRepository(name).toRight { NotFound() }
+      // Basic authentication
+      _ <- if(registry.isPrivate){ basicAuthentication().map(x => Some(x)) } else Right(None)
       // Overwrite check
       path = multiParams("splat").head
       file = new File(s"${RegistryPath}/${name}/${path}")

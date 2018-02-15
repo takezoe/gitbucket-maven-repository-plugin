@@ -1,25 +1,28 @@
 @(registry: Option[io.github.gitbucket.mavenrepository.model.Registry])(implicit context: gitbucket.core.controller.Context)
 @gitbucket.core.html.main("Maven repositories") {
   @gitbucket.core.admin.html.menu("maven") {
-    <h1>@if(registry.isEmpty){ New Maven repository } else { Edit Maven repository }</h1>
-    <form method="POST" validate="true">
+    <form method="POST" validate="true" autocomplete="off">
       <fieldset class="form-group">
-        <label for="name">Repository name</label>
-        <input type="text" id="name" name="name" class="form-control" value="@registry.map(_.name)" @if(registry.nonEmpty){disabled}/>
-        <span id="error-name" class="error"></span>
+        <label for="name" class="col-md-2">Repository name</label>
+        <div class="col-md-10">
+          <input type="text" id="name" name="name" class="form-control" value="@registry.map(_.name)" @if(registry.nonEmpty){disabled}/>
+          <span id="error-name" class="error"></span>
+        </div>
       </fieldset>
       <fieldset class="form-group">
-        <label for="description">Description</label>
-        <input type="text" id="description" name="description" class="form-control" value="@registry.map(_.description)"/>
-        <span id="error-description" class="error"></span>
+        <label for="description" class="col-md-2">Description</label>
+        <div class="col-md-10">
+          <input type="text" id="description" name="description" class="form-control" value="@registry.map(_.description)"/>
+          <span id="error-description" class="error"></span>
+        </div>
       </fieldset>
       <fieldset class="form-group">
-        <label for="overwrite">
+        <label for="overwrite" class="col-md-12">
           <input type="checkbox" id="overwrite" name="overwrite" @if(registry.exists(_.overwrite)){checked}/> Allow overwrite
         </label>
       </fieldset>
       <fieldset class="form-group">
-        <label for="isPrivate">
+        <label for="isPrivate" class="col-md-12">
           <input type="checkbox" id="isPrivate" name="isPrivate" @if(registry.exists(_.isPrivate)){checked}/> Require Basic authentication
         </label>
       </fieldset>

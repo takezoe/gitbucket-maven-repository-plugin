@@ -9,10 +9,10 @@ import gitbucket.core.service.AccountService
 import gitbucket.core.util.{AuthUtil, FileUtil}
 import gitbucket.core.util.SyntaxSugars.using
 import gitbucket.core.util.Implicits._
-import io.github.gitbucket.mavenrepository.model.Registry
 import io.github.gitbucket.mavenrepository.service.MavenRepositoryService
 import org.apache.commons.io.IOUtils
 import org.scalatra.forms._
+import org.scalatra.i18n.Messages
 import org.scalatra.{ActionResult, NotAcceptable, Ok}
 
 class MavenRepositoryController extends ControllerBase with AccountService with MavenRepositoryService {
@@ -21,7 +21,7 @@ class MavenRepositoryController extends ControllerBase with AccountService with 
   case class RepositoryEditForm(description: Option[String], overwrite: Boolean, isPrivate: Boolean)
 
   val repositoryCreateForm = mapping(
-    "name"        -> trim(label("Name", text(required, identifier, maxlength(100)))), // TODO Unique check
+    "name"        -> trim(label("Name", text(required, identifier, maxlength(100), unique))),
     "description" -> trim(label("Description", optional(text()))),
     "overwrite"   -> trim(boolean()),
     "isPrivate"   -> trim(boolean())
@@ -193,6 +193,12 @@ class MavenRepositoryController extends ControllerBase with AccountService with 
     result match {
       case Right(result) => result
       case Left(result)  => result
+    }
+  }
+
+  private def unique: Constraint = new Constraint(){
+    override def validate(name: String, value: String, messages: Messages): Option[String] = {
+      getMavenRepository(value).map { _ => "Repository already exist." }
     }
   }
 }

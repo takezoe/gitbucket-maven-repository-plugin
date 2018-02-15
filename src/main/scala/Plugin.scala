@@ -34,21 +34,11 @@ class Plugin extends gitbucket.core.plugin.Plugin with MavenRepositoryService {
 
   override val sshCommandProviders = Seq({
     case command: String if checkCommand(command) => {
-      val index = command.indexOf('/')
-      val path = command.substring(index + "/maven".length)
-
+      val index        = command.indexOf('/')
+      val path         = command.substring(index + "/maven".length)
       val registryName = path.split("/")(1)
-      val registry = Database() withTransaction { implicit session =>
-        getMavenRepository(registryName).get
-      }
-
-//      val registryPath = s"${RegistryPath}/${registry.name}"
-//      val registryDir = new File(registryPath)
-//      if(!registryDir.exists){
-//        registryDir.mkdirs()
-//      }
-
-      val fullPath = s"${RegistryPath}/${path}"
+      val registry     = Database() withTransaction { implicit session => getMavenRepository(registryName).get }
+      val fullPath     = s"${RegistryPath}/${path}"
 
       if(command.startsWith("scp")){
         new ScpCommand(s"scp -t -d ${fullPath}", null, true, 1024 * 128, 1024 * 128, new DefaultScpFileOpener(){
@@ -91,7 +81,7 @@ class Plugin extends gitbucket.core.plugin.Plugin with MavenRepositoryService {
   )
 
   override val systemSettingMenus: Seq[Context => Option[Link]] = Seq(
-    _ => Some(Link("maven", "Maven repositories", "admin/maven"))
+    _ => Some(Link("maven", "Maven repositories", "admin/maven", Some("package")))
   )
 
 }

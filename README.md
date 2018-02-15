@@ -21,6 +21,7 @@ You can also deploy via SSH (SCP) with public key authentication using keys regi
 
 Plugin version | GitBucket version
 :--------------|:--------------------
+1.1.x -        | 4.21.x -
 1.0.x -        | 4.19.x -
 
 ## Installation
@@ -42,6 +43,9 @@ resolvers ++= Seq(
  "GitBucket Snapshots Repository" at "http://localhost:8080/maven/snapshots",
  "GitBucket Releases Repository"  at "http://localhost:8080/maven/releases"
 )
+
+// If repository is private, you have to add authentication information
+credentials += Credentials("GitBucket Maven Repository", "localhost", "username", "password")
 ```
 
 Publish via WebDAV:

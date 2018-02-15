@@ -39,10 +39,10 @@ class Plugin extends gitbucket.core.plugin.Plugin with MavenRepositoryService {
 
       val registryName = path.split("/")(1)
       val registry = Database() withTransaction { implicit session =>
-        getMavenRepositories().find(_.name == registryName).get
+        getMavenRepository(registryName).get
       }
 
-      val registryPath = s"${RegistryPath}/${registry.name}"
+//      val registryPath = s"${RegistryPath}/${registry.name}"
 //      val registryDir = new File(registryPath)
 //      if(!registryDir.exists){
 //        registryDir.mkdirs()

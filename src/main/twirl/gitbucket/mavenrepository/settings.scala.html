@@ -22,11 +22,23 @@
         <td>@registry.overwrite</td>
         <td>@registry.isPrivate</td>
         <td>
-          <a href="" class="btn btn-default btn-sm">Edit</a>
-          <a href="" class="btn btn-danger btn-sm">Delete</a>
+          <a href="@context.path/admin/maven/@registry.name/_edit" class="btn btn-default btn-sm">Edit</a>
+          <a href="javascript:void(0);" data-name="@registry.name" class="delete-registry btn btn-danger btn-sm">Delete</a>
         </td>
       </tr>
     }
     </table>
+    <form id="form" method="POST" action=""></form>
   }
 }
+<script>
+$(function(){
+  $('.delete-registry').click(function(e){
+    var name = $(e.target).data('name');
+    if(confirm('Delete "' + name + '" repository. Are you sure?')){
+      $('#form').attr('action', '@context.path/admin/maven/' + name + '/_delete').submit();
+    }
+  });
+});
+</script>
+

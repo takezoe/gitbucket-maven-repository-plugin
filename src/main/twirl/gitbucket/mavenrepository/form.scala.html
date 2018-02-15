@@ -1,30 +1,34 @@
-@()(implicit context: gitbucket.core.controller.Context)
+@(registry: Option[io.github.gitbucket.mavenrepository.model.Registry])(implicit context: gitbucket.core.controller.Context)
 @gitbucket.core.html.main("Maven repositories") {
   @gitbucket.core.admin.html.menu("maven") {
-    <h1>New Maven repository</h1>
-    <form method="POST" action="@context.path/admin/maven/_new" validate="true">
+    <h1>@if(registry.isEmpty){ New Maven repository } else { Edit Maven repository }</h1>
+    <form method="POST" validate="true">
       <fieldset class="form-group">
         <label for="name">Repository name</label>
-        <input type="text" id="name" name="name" class="form-control"/>
+        <input type="text" id="name" name="name" class="form-control" value="@registry.map(_.name)" @if(registry.nonEmpty){disabled}/>
         <span id="error-name" class="error"></span>
       </fieldset>
       <fieldset class="form-group">
         <label for="description">Description</label>
-        <input type="text" id="description" name="description" class="form-control"/>
+        <input type="text" id="description" name="description" class="form-control" value="@registry.map(_.description)"/>
         <span id="error-description" class="error"></span>
       </fieldset>
       <fieldset class="form-group">
         <label for="overwrite">
-          <input type="checkbox" id="overwrite" name="overwrite"/> Allow overwrite
+          <input type="checkbox" id="overwrite" name="overwrite" @if(registry.exists(_.overwrite)){checked}/> Allow overwrite
         </label>
       </fieldset>
       <fieldset class="form-group">
         <label for="isPrivate">
-          <input type="checkbox" id="isPrivate" name="isPrivate"/> Require Basic authentication
+          <input type="checkbox" id="isPrivate" name="isPrivate" @if(registry.exists(_.isPrivate)){checked}/> Require Basic authentication
         </label>
       </fieldset>
       <fieldset class="form-group">
-        <input type="submit" value="Create" class="btn btn-success"/>
+        @if(registry.isEmpty){
+          <input type="submit" value="Create" class="btn btn-success" formaction="@context.path/admin/maven/_new" />
+        } else {
+          <input type="submit" value="Update" class="btn btn-success" formaction="@context.path/admin/maven/@registry.map(_.name)/_edit"/>
+        }
         <a href="@context.path/admin/maven" class="btn btn-default">Cancel</a>
       </fieldset>
     </form>

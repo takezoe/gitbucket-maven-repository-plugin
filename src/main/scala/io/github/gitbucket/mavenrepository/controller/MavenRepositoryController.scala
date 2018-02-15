@@ -17,14 +17,21 @@ import org.scalatra.{ActionResult, NotAcceptable, Ok}
 
 class MavenRepositoryController extends ControllerBase with AccountService with MavenRepositoryService {
 
-  case class RepositoryCreationForm(name: String, description: Option[String], overwrite: Boolean, isPrivate: Boolean)
+  case class RepositoryCreateForm(name: String, description: Option[String], overwrite: Boolean, isPrivate: Boolean)
+  case class RepositoryEditForm(description: Option[String], overwrite: Boolean, isPrivate: Boolean)
 
-  val repositoryCreationForm = mapping(
-    "name"        -> trim(label("Name", text(required, maxlength(100)))), // TODO Identifier check and Unique check
+  val repositoryCreateForm = mapping(
+    "name"        -> trim(label("Name", text(required, identifier, maxlength(100)))), // TODO Unique check
     "description" -> trim(label("Description", optional(text()))),
     "overwrite"   -> trim(boolean()),
     "isPrivate"   -> trim(boolean())
-  )(RepositoryCreationForm.apply)
+  )(RepositoryCreateForm.apply)
+
+  val repositoryEditForm = mapping(
+    "description" -> trim(label("Description", optional(text()))),
+    "overwrite"   -> trim(boolean()),
+    "isPrivate"   -> trim(boolean())
+  )(RepositoryEditForm.apply)
 
 
   get("/admin/maven"){
@@ -32,14 +39,27 @@ class MavenRepositoryController extends ControllerBase with AccountService with 
   }
 
   get("/admin/maven/_new"){
-    gitbucket.mavenrepository.html.form()
+    gitbucket.mavenrepository.html.form(None)
   }
 
-  post("/admin/maven/_new", repositoryCreationForm){ form =>
-    createRegistry(Registry(form.name, form.description, form.overwrite, form.isPrivate))
+  post("/admin/maven/_new", repositoryCreateForm){ form =>
+    createRegistry(form.name, form.description, form.overwrite, form.isPrivate)
     redirect("/admin/maven")
   }
 
+  get("/admin/maven/:name/_edit"){
+    gitbucket.mavenrepository.html.form(getMavenRepository(params("name")))
+  }
+
+  post("/admin/maven/:name/_edit", repositoryEditForm){ form =>
+    updateRegistry(params("name"), form.description, form.overwrite, form.isPrivate)
+    redirect("/admin/maven")
+  }
+
+  post("/admin/maven/:name/_delete"){
+    deleteRegistry(params("name"))
+    redirect("/admin/maven")
+  }
 
   get("/maven/?"){
     Ok(<html>

@@ -1,50 +1,113 @@
 package io.github.gitbucket.mavenrepository.controller
 
 import java.io.{File, FileInputStream, FileOutputStream}
-import javax.servlet.http.HttpServletResponse
 
 import io.github.gitbucket.mavenrepository._
 import gitbucket.core.controller.ControllerBase
+import gitbucket.core.model.Account
 import gitbucket.core.service.AccountService
 import gitbucket.core.util.{AuthUtil, FileUtil}
 import gitbucket.core.util.SyntaxSugars.using
 import gitbucket.core.util.Implicits._
+import io.github.gitbucket.mavenrepository.service.MavenRepositoryService
 import org.apache.commons.io.IOUtils
-import org.scalatra.Ok
+import org.scalatra.forms._
+import org.scalatra.i18n.Messages
+import org.scalatra.{ActionResult, NotAcceptable, Ok}
 
-class MavenRepositoryController extends ControllerBase with AccountService {
+class MavenRepositoryController extends ControllerBase with AccountService with MavenRepositoryService {
 
-  get("/maven/?"){
-    Ok(<html>
-      <head>
-        <title>Available repositories</title>
-      </head>
-      <body>
-        <h1>Library repositories</h1>
-        <ul>
-          {Registries.map { registory =>
-            <li>
-              <a href={context.baseUrl + "/maven/" + registory.name + "/"}>{registory.name}</a>
-            </li>
-          }}
-        </ul>
-      </body>
-    </html>)
+  case class RepositoryCreateForm(name: String, description: Option[String], overwrite: Boolean, isPrivate: Boolean)
+  case class RepositoryEditForm(description: Option[String], overwrite: Boolean, isPrivate: Boolean)
+
+  val repositoryCreateForm = mapping(
+    "name"        -> trim(label("Name", text(required, identifier, maxlength(100), unique))),
+    "description" -> trim(label("Description", optional(text()))),
+    "overwrite"   -> trim(boolean()),
+    "isPrivate"   -> trim(boolean())
+  )(RepositoryCreateForm.apply)
+
+  val repositoryEditForm = mapping(
+    "description" -> trim(label("Description", optional(text()))),
+    "overwrite"   -> trim(boolean()),
+    "isPrivate"   -> trim(boolean())
+  )(RepositoryEditForm.apply)
+
+
+  get("/admin/maven"){
+    gitbucket.mavenrepository.html.settings(getMavenRepositories())
   }
+
+  get("/admin/maven/_new"){
+    gitbucket.mavenrepository.html.form(None)
+  }
+
+  post("/admin/maven/_new", repositoryCreateForm){ form =>
+    createRegistry(form.name, form.description, form.overwrite, form.isPrivate)
+    redirect("/admin/maven")
+  }
+
+  get("/admin/maven/:name/_edit"){
+    gitbucket.mavenrepository.html.form(getMavenRepository(params("name")))
+  }
+
+  post("/admin/maven/:name/_edit", repositoryEditForm){ form =>
+    updateRegistry(params("name"), form.description, form.overwrite, form.isPrivate)
+    redirect("/admin/maven")
+  }
+
+  post("/admin/maven/:name/_delete"){
+    deleteRegistry(params("name"))
+    redirect("/admin/maven")
+  }
+
+//  get("/maven/?"){
+//    Ok(<html>
+//      <head>
+//        <title>Available repositories</title>
+//      </head>
+//      <body>
+//        <h1>Library repositories</h1>
+//        <ul>
+//          {getMavenRepositories().map { registory =>
+//            <li>
+//              <a href={context.baseUrl + "/maven/" + registory.name + "/"}>{registory.name}</a>
+//            </li>
+//          }}
+//        </ul>
+//      </body>
+//    </html>)
+//  }
 
   get("/maven/:name"){
     val name = params("name")
     redirect(s"/maven/${name}/")
   }
 
+  private def basicAuthentication(): Either[ActionResult, Account] = {
+    request.header("Authorization").flatMap {
+      case auth if auth.startsWith("Basic ") => {
+        val Array(username, password) = AuthUtil.decodeAuthHeader(auth).split(":", 2)
+        authenticate(context.settings, username, password)
+      }
+      case _ => None
+    }.toRight {
+      response.setHeader("WWW-Authenticate", "Basic realm=\"GitBucket Maven Repository\"")
+      org.scalatra.Unauthorized()
+    }
+  }
+
   get("/maven/:name/*"){
     val name = params("name")
 
-    if(Registries.exists(_.name == name)){
-      val path = multiParams("splat").head
-      val fullPath = s"${RegistryPath}/${name}/${path}"
-      val file = new File(fullPath)
-
+    val result = for {
+      // Find registry
+      registry <- getMavenRepository(name).toRight { NotFound() }
+      // Basic authentication
+      _ <- if(registry.isPrivate){ basicAuthentication().map(x => Some(x)) } else Right(None)
+      path = multiParams("splat").head
+      file = new File(s"${RegistryPath}/${name}/${path}")
+    } yield {
       file match {
         // Download the file
         case f if f.exists && f.isFile =>
@@ -75,14 +138,16 @@ class MavenRepositoryController extends ControllerBase with AccountService {
             <body>
               <h1>{name} - /{path}</h1>
               <ul>
-                <li><a href="../">../</a></li>
+                {if(path != ""){
+                  <li><a href="../">../</a></li>
+                }}
                 {files.map { file =>
                   <li>
-                    {if(file.isDirectory) {
-                      <a href={context.baseUrl + "/maven/" + name + "/" + path + file.getName + "/"}>{file.getName}/</a>
-                    } else {
-                      <a href={context.baseUrl + "/maven/" + name + "/" + path + file.getName}>{file.getName}</a>
-                    }}
+                  {if(file.isDirectory) {
+                    <a href={context.baseUrl + "/maven/" + name + "/" + path + file.getName + "/"}>{file.getName}/</a>
+                  } else {
+                    <a href={context.baseUrl + "/maven/" + name + "/" + path + file.getName}>{file.getName}</a>
+                  }}
                   </li>
                 }}
               </ul>
@@ -92,35 +157,29 @@ class MavenRepositoryController extends ControllerBase with AccountService {
         // Otherwise
         case _ => NotFound()
       }
-    } else NotFound()
+    }
+
+    result match {
+      case Right(result) => result
+      case Left(result)  => result
+    }
   }
 
   put("/maven/:name/*"){
-    for {
-      // Basic authentication
-      _ <- request.header("Authorization").flatMap {
-             case auth if auth.startsWith("Basic ") => {
-               val Array(username, password) = AuthUtil.decodeAuthHeader(auth).split(":", 2)
-               authenticate(context.settings, username, password)
-             }
-             case _ => None
-           }.toRight {
-             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED)
-             response.setHeader("WWW-Authenticate", "Basic realm=\"GitBucket Maven Repository\"")
-           }
+    val name = params("name")
+
+    val result = for {
       // Find registry
-      name = params("name")
-      registry <- Registries.find(_.name == name).toRight {
-                    response.setStatus(HttpServletResponse.SC_NOT_FOUND)
-                  }
+      registry <- getMavenRepository(name).toRight { NotFound() }
+      // Basic authentication
+      _ <- if(registry.isPrivate){ basicAuthentication().map(x => Some(x)) } else Right(None)
       // Overwrite check
       path = multiParams("splat").head
       file = new File(s"${RegistryPath}/${name}/${path}")
       _    <- if(file.getName == "maven-metadata.xml" || file.getName.startsWith("maven-metadata.xml.")){
                 Right(())
               } else if(registry.overwrite == false && file.exists){
-                response.setStatus(HttpServletResponse.SC_NOT_ACCEPTABLE)
-                Left(())
+                Left(NotAcceptable())
               } else {
                 Right(())
               }
@@ -133,6 +192,17 @@ class MavenRepositoryController extends ControllerBase with AccountService {
         IOUtils.copy(request.getInputStream, out)
       }
       Ok()
+    }
+
+    result match {
+      case Right(result) => result
+      case Left(result)  => result
+    }
+  }
+
+  private def unique: Constraint = new Constraint(){
+    override def validate(name: String, value: String, messages: Messages): Option[String] = {
+      getMavenRepository(value).map { _ => "Repository already exist." }
     }
   }
 }

@@ -1,0 +1,46 @@
+@(registries: Seq[io.github.gitbucket.mavenrepository.model.Registry])(implicit context: gitbucket.core.controller.Context)
+@gitbucket.core.html.main("Maven repositories") {
+  @gitbucket.core.admin.html.menu("maven") {
+    <div class="pull-right">
+      <a href="@context.baseUrl/admin/maven/_new" class="btn btn-default">New maven repository</a>
+    </div>
+    <h1>Maven repositories</h1>
+    <table class="table table-bordered table-hover">
+      <tr>
+        <th width="100">Name</th>
+        <th width="250">Description</th>
+        <th width="100">Type</th>
+        <th>URL</th>
+        <th width="100">Overwrite</th>
+        <th width="100">Private</th>
+        <th width="120"></th>
+      </tr>
+    @registries.map { registry =>
+      <tr>
+        <td>@registry.name</td>
+        <td>@registry.description</td>
+        <td>Maven</td>
+        <td><a href="@context.baseUrl/maven/@registry.name/" target="_blank">@context.baseUrl/maven/@registry.name/</a></td>
+        <td>@registry.overwrite</td>
+        <td>@registry.isPrivate</td>
+        <td>
+          <a href="@context.path/admin/maven/@registry.name/_edit" class="btn btn-default btn-sm">Edit</a>
+          <a href="javascript:void(0);" data-name="@registry.name" class="delete-registry btn btn-danger btn-sm">Delete</a>
+        </td>
+      </tr>
+    }
+    </table>
+    <form id="form" method="POST" action=""></form>
+  }
+}
+<script>
+$(function(){
+  $('.delete-registry').click(function(e){
+    var name = $(e.target).data('name');
+    if(confirm('Delete "' + name + '" repository. Are you sure?')){
+      $('#form').attr('action', '@context.path/admin/maven/' + name + '/_delete').submit();
+    }
+  });
+});
+</script>
+

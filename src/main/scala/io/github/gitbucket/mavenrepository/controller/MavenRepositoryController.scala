@@ -1,6 +1,7 @@
 package io.github.gitbucket.mavenrepository.controller
 
 import java.io.{File, FileInputStream, FileOutputStream}
+import java.nio.file.{Files, Paths}
 
 import io.github.gitbucket.mavenrepository._
 import gitbucket.core.controller.ControllerBase
@@ -10,7 +11,7 @@ import gitbucket.core.util.{AuthUtil, FileUtil}
 import gitbucket.core.util.SyntaxSugars.using
 import gitbucket.core.util.Implicits._
 import io.github.gitbucket.mavenrepository.service.MavenRepositoryService
-import org.apache.commons.io.IOUtils
+import org.apache.commons.io.{FileUtils, IOUtils}
 import org.scalatra.forms._
 import org.scalatra.i18n.Messages
 import org.scalatra.{ActionResult, NotAcceptable, Ok}
@@ -159,10 +160,7 @@ class MavenRepositoryController extends ControllerBase with AccountService with 
       }
     }
 
-    result match {
-      case Right(result) => result
-      case Left(result)  => result
-    }
+    result.fold(identity, identity)
   }
 
   put("/maven/:name/*"){
@@ -178,7 +176,7 @@ class MavenRepositoryController extends ControllerBase with AccountService with 
       file = new File(s"${RegistryPath}/${name}/${path}")
       _    <- if(file.getName == "maven-metadata.xml" || file.getName.startsWith("maven-metadata.xml.")){
                 Right(())
-              } else if(registry.overwrite == false && file.exists){
+              } else if(!registry.overwrite && file.exists){
                 Left(NotAcceptable())
               } else {
                 Right(())
@@ -194,10 +192,40 @@ class MavenRepositoryController extends ControllerBase with AccountService with 
       Ok()
     }
 
-    result match {
-      case Right(result) => result
-      case Left(result)  => result
+    result.fold(identity, identity)
+  }
+
+  // authentication required
+  // delete artifacts, only if the registry is overwritable
+  delete("/maven/:name/*") {
+    val name = params("name")
+    val result = for {
+      registry <- getMavenRepository(name).toRight(NotFound())
+      _<- basicAuthentication()
+      path = multiParams("splat").head
+      file = Paths.get(RegistryPath, name, path)
+      repoBase = Paths.get(RegistryPath, registry.name)
+      _ <- if (!Files.exists(file) || !registry.overwrite) {
+        Left(NotAcceptable())
+      } else {
+        Right(())
+      }
+    } yield {
+      if (Files.isSameFile(repoBase, file)) {
+        // clean up repository
+        FileUtils.cleanDirectory(file.toFile)
+      } else {
+        // remove file and remove the directory if it's empty
+        FileUtils.deleteDirectory(file.toFile)
+        val parent = file.getParent
+        if (!Files.isSameFile(repoBase, parent)) {
+          FileUtil.deleteDirectoryIfEmpty(parent.toFile)
+        }
+      }
+      Ok()
     }
+
+    result.fold(identity, identity)
   }
 
   private def unique: Constraint = new Constraint(){

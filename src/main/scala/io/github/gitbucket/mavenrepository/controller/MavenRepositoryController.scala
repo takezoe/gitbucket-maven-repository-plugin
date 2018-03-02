@@ -7,7 +7,7 @@ import io.github.gitbucket.mavenrepository._
 import gitbucket.core.controller.ControllerBase
 import gitbucket.core.model.Account
 import gitbucket.core.service.AccountService
-import gitbucket.core.util.{AuthUtil, FileUtil}
+import gitbucket.core.util.{AdminAuthenticator, AuthUtil, FileUtil}
 import gitbucket.core.util.SyntaxSugars.using
 import gitbucket.core.util.Implicits._
 import io.github.gitbucket.mavenrepository.service.MavenRepositoryService
@@ -16,7 +16,8 @@ import org.scalatra.forms._
 import org.scalatra.i18n.Messages
 import org.scalatra.{ActionResult, NotAcceptable, Ok}
 
-class MavenRepositoryController extends ControllerBase with AccountService with MavenRepositoryService {
+class MavenRepositoryController extends ControllerBase with AccountService with MavenRepositoryService
+  with AdminAuthenticator {
 
   case class RepositoryCreateForm(name: String, description: Option[String], overwrite: Boolean, isPrivate: Boolean)
   case class RepositoryEditForm(description: Option[String], overwrite: Boolean, isPrivate: Boolean)
@@ -35,50 +36,32 @@ class MavenRepositoryController extends ControllerBase with AccountService with 
   )(RepositoryEditForm.apply)
 
 
-  get("/admin/maven"){
+  get("/admin/maven")(adminOnly {
     gitbucket.mavenrepository.html.settings(getMavenRepositories())
-  }
+  })
 
-  get("/admin/maven/_new"){
+  get("/admin/maven/_new")(adminOnly {
     gitbucket.mavenrepository.html.form(None)
-  }
+  })
 
-  post("/admin/maven/_new", repositoryCreateForm){ form =>
+  post("/admin/maven/_new", repositoryCreateForm)(adminOnly { form =>
     createRegistry(form.name, form.description, form.overwrite, form.isPrivate)
     redirect("/admin/maven")
-  }
+  })
 
-  get("/admin/maven/:name/_edit"){
+  get("/admin/maven/:name/_edit")(adminOnly {
     gitbucket.mavenrepository.html.form(getMavenRepository(params("name")))
-  }
+  })
 
-  post("/admin/maven/:name/_edit", repositoryEditForm){ form =>
+  post("/admin/maven/:name/_edit", repositoryEditForm)(adminOnly { form =>
     updateRegistry(params("name"), form.description, form.overwrite, form.isPrivate)
     redirect("/admin/maven")
-  }
+  })
 
-  post("/admin/maven/:name/_delete"){
+  post("/admin/maven/:name/_delete")(adminOnly {
     deleteRegistry(params("name"))
     redirect("/admin/maven")
-  }
-
-//  get("/maven/?"){
-//    Ok(<html>
-//      <head>
-//        <title>Available repositories</title>
-//      </head>
-//      <body>
-//        <h1>Library repositories</h1>
-//        <ul>
-//          {getMavenRepositories().map { registory =>
-//            <li>
-//              <a href={context.baseUrl + "/maven/" + registory.name + "/"}>{registory.name}</a>
-//            </li>
-//          }}
-//        </ul>
-//      </body>
-//    </html>)
-//  }
+  })
 
   get("/maven/:name"){
     val name = params("name")
@@ -97,6 +80,19 @@ class MavenRepositoryController extends ControllerBase with AccountService with 
       org.scalatra.Unauthorized()
     }
   }
+
+  post("/admin/maven/:name/_deletefiles")(adminOnly {
+    val name = params("name")
+    val path = params("path")
+    val files = multiParams("files")
+
+    files.foreach { file =>
+      val f = new File(s"${RegistryPath}/${name}${path}${file}")
+      FileUtils.deleteQuietly(f)
+    }
+
+    redirect(s"/maven/${name}${path}")
+  })
 
   get("/maven/:name/*"){
     val name = params("name")
@@ -132,28 +128,7 @@ class MavenRepositoryController extends ControllerBase with AccountService with 
             }
           }
 
-          Ok(<html>
-            <head>
-              <title>{name} - /{path}</title>
-            </head>
-            <body>
-              <h1>{name} - /{path}</h1>
-              <ul>
-                {if(path != ""){
-                  <li><a href="../">../</a></li>
-                }}
-                {files.map { file =>
-                  <li>
-                  {if(file.isDirectory) {
-                    <a href={context.baseUrl + "/maven/" + name + "/" + path + file.getName + "/"}>{file.getName}/</a>
-                  } else {
-                    <a href={context.baseUrl + "/maven/" + name + "/" + path + file.getName}>{file.getName}</a>
-                  }}
-                  </li>
-                }}
-              </ul>
-            </body>
-          </html>)
+          gitbucket.mavenrepository.html.files(name, path, files)
 
         // Otherwise
         case _ => NotFound()

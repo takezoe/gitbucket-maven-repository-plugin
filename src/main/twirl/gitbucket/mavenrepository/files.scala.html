@@ -1,0 +1,70 @@
+@(name: String, path: String, files: Seq[java.io.File])(implicit context: gitbucket.core.controller.Context)
+@import gitbucket.core.view.helpers._
+@gitbucket.core.html.main(s"$name - /$path"){
+  <div class="content-wrapper main-center">
+    <div class="content body">
+      <form method="POST" action="@context.path/admin/maven/@name/_deletefiles">
+        @context.loginAccount.collect { case account if account.isAdmin =>
+          <input type="submit" value="Delete" class="btn btn-danger pull-right" id="delete">
+          <input type="hidden" name="path" value="/@path">
+        }
+        <h1>
+          <a href="@context.baseUrl/maven/@name/">@name</a>
+          @defining(path.split("/")){ fragments =>
+            @fragments.zipWithIndex.map { case (fragment, i) =>
+              /
+              @if(i == fragments.size - 1){
+                @fragment
+              } else {
+                <a href="@context.baseUrl/maven/@name/@fragments.take(i + 1).mkString("/")/">@fragment</a>
+              }
+            }
+          }
+        </h1>
+        <table class="table table-bordered table-hover">
+          <tr>
+            @context.loginAccount.collect { case account if account.isAdmin=>
+              <th></th>
+            }
+            <th width="50%">Name</th>
+            <th width="25%">Size</th>
+            <th width="25%">Date</th>
+          </tr>
+          @files.map { file =>
+            <tr>
+              @context.loginAccount.collect { case account if account.isAdmin =>
+                <td>
+                  <input type="checkbox" name="files" value="@file.getName">
+                </td>
+              }
+              <td>
+                @if(file.isDirectory){
+                  <i class="octicon octicon-file-directory"></i>
+                  <a href="@context.baseUrl/maven/@name/@path@file.getName/">@file.getName/</a>
+                } else {
+                  <i class="octicon octicon-file-text"></i>
+                  <a href="@context.baseUrl/maven/@name/@path@file.getName">@file.getName</a>
+                }
+              </td>
+              <td>
+                @if(file.isFile){
+                  @{Math.ceil(file.length.toDouble / 1024)}KB
+                }
+              </td>
+              <td>@datetime(new java.util.Date(file.lastModified))</td>
+            </tr>
+          }
+        </table>
+      </form>
+    </div>
+  </div>
+}
+@context.loginAccount.collect { case account if account.isAdmin =>
+<script>
+$(function () {
+  $('#delete').click(function(){
+    return confirm('Are you sure you want to delete checked files?');
+  });
+});
+</script>
+}

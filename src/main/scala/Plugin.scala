@@ -30,7 +30,8 @@ class Plugin extends gitbucket.core.plugin.Plugin with MavenRepositoryService {
         new File(s"${RegistryPath}/snapshots").mkdirs()
       }
     ),
-    new Version("1.2.0")
+    new Version("1.2.0"),
+    new Version("1.2.1")
   )
 
   override val sshCommandProviders = Seq({

@@ -2,7 +2,7 @@
 @gitbucket.core.html.main("Maven repositories") {
   @gitbucket.core.admin.html.menu("maven") {
     <div class="pull-right">
-      <a href="@context.baseUrl/admin/maven/_new" class="btn btn-default">New maven repository</a>
+      <a href="@context.baseUrl/admin/maven/_new" class="btn btn-success">New maven repository</a>
     </div>
     <h1>Maven repositories</h1>
     <table class="table table-bordered table-hover">
@@ -24,8 +24,10 @@
         <td>@registry.overwrite</td>
         <td>@registry.isPrivate</td>
         <td>
-          <a href="@context.path/admin/maven/@registry.name/_edit" class="btn btn-default btn-sm">Edit</a>
-          <a href="javascript:void(0);" data-name="@registry.name" class="delete-registry btn btn-danger btn-sm">Delete</a>
+          <span style="white-space: nowrap;">
+            <a href="@context.path/admin/maven/@registry.name/_edit" class="btn btn-default btn-sm">Edit</a>
+            <a href="javascript:void(0);" data-name="@registry.name" class="delete-registry btn btn-danger btn-sm">Delete</a>
+          </span>
         </td>
       </tr>
     }

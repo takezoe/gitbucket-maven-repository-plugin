@@ -46,9 +46,9 @@
                   <a href="@context.baseUrl/maven/@name/@path@file.getName">@file.getName</a>
                 }
               </td>
-              <td>
+              <td class="text-right">
                 @if(file.isFile){
-                  @{Math.ceil(file.length.toDouble / 1024)}KB
+                  @{Math.ceil(file.length.toDouble / 1024 * 10) / 10}KB
                 }
               </td>
               <td>@datetime(new java.util.Date(file.lastModified))</td>

@@ -63,7 +63,12 @@
 <script>
 $(function () {
   $('#delete').click(function(){
-    return confirm('Are you sure you want to delete checked files?');
+    if($('input[name=files]:checked').val()){
+      return confirm('Are you sure you want to delete checked files?');
+    } else {
+      alert('Please choose files to be deleted.');
+      return false;
+    }
   });
 });
 </script>

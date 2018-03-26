@@ -63,11 +63,6 @@ class MavenRepositoryController extends ControllerBase with AccountService with 
     redirect("/admin/maven")
   })
 
-  get("/maven/:name"){
-    val name = params("name")
-    redirect(s"/maven/${name}/")
-  }
-
   private def basicAuthentication(): Either[ActionResult, Account] = {
     request.header("Authorization").flatMap {
       case auth if auth.startsWith("Basic ") => {
@@ -94,15 +89,21 @@ class MavenRepositoryController extends ControllerBase with AccountService with 
     redirect(s"/maven/${name}${path}")
   })
 
-  get("/maven/:name/*"){
-    val name = params("name")
+  get("/maven/:name"){
+    download(params("name"), "")
+  }
 
+  get("/maven/:name/*"){
+    download(params("name"), multiParams("splat").head)
+  }
+
+  private def download(name: String, path: String) = {
     val result = for {
       // Find registry
       registry <- getMavenRepository(name).toRight { NotFound() }
       // Basic authentication
       _ <- if(registry.isPrivate){ basicAuthentication().map(x => Some(x)) } else Right(None)
-      path = multiParams("splat").head
+      //path = multiParams("splat").head
       file = new File(s"${RegistryPath}/${name}/${path}")
     } yield {
       file match {
@@ -113,10 +114,6 @@ class MavenRepositoryController extends ControllerBase with AccountService with 
           using(new FileInputStream(file)){ in =>
             IOUtils.copy(in, response.getOutputStream)
           }
-
-        // Redirect to the normalized url for the directory
-        case f if f.exists && f.isDirectory && path.nonEmpty && !path.endsWith("/") =>
-          redirect(s"/maven/${name}/${path}/")
 
         // Render the directory index
         case f if f.exists && f.isDirectory =>

@@ -38,12 +38,15 @@
                 </td>
               }
               <td>
-                @if(file.isDirectory){
+                @if(file.isDirectory) {
                   <i class="octicon octicon-file-directory"></i>
-                  <a href="@context.baseUrl/maven/@name/@path@file.getName/">@file.getName/</a>
-                } else {
+                }else{
                   <i class="octicon octicon-file-text"></i>
-                  <a href="@context.baseUrl/maven/@name/@path@file.getName">@file.getName</a>
+                }
+                @if(path.nonEmpty){
+                  <a href="@context.baseUrl/maven/@name/@path/@file.getName/">@file.getName/</a>
+                }else{
+                  <a href="@context.baseUrl/maven/@name/@path@file.getName/">@file.getName/</a>
                 }
               </td>
               <td class="text-right">

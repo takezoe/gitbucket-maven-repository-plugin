@@ -34,8 +34,7 @@ class Plugin extends gitbucket.core.plugin.Plugin with MavenRepositoryService {
     new Version("1.2.1"),
     new Version("1.3.0"),
     new Version("1.3.1"),
-    new Version("1.3.2"),
-    new Version("1.4.0")
+    new Version("1.3.2")
   )
 
   override val sshCommandProviders = Seq({
@@ -47,7 +46,7 @@ class Plugin extends gitbucket.core.plugin.Plugin with MavenRepositoryService {
       val fullPath     = s"${RegistryPath}/${path}"
 
       if(command.startsWith("scp")){
-        new ScpCommand(s"scp -t -d ${fullPath}", null, 1024 * 128, 1024 * 128, new DefaultScpFileOpener(){
+        new ScpCommand(s"scp -t -d ${fullPath}", null, true, 1024 * 128, 1024 * 128, new DefaultScpFileOpener(){
           override def openWrite(session: Session, file: Path, options: OpenOption*): OutputStream = {
             val fileName = file.getFileName.toString
             if(fileName == "maven-metadata.xml" || fileName.startsWith("maven-metadata.xml.")){

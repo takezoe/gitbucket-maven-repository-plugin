@@ -2,7 +2,7 @@ package io.github.gitbucket.mavenrepository.command
 
 import java.io.{InputStream, OutputStream}
 
-import org.apache.sshd.server.Command
+import org.apache.sshd.server.command.Command
 import org.apache.sshd.server.{Environment, ExitCallback}
 
 abstract class AbstractCommand extends Command {

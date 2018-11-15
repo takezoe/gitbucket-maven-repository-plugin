@@ -85,6 +85,8 @@ class Plugin extends gitbucket.core.plugin.Plugin with MavenRepositoryService {
     "/admin/maven/*" -> controller
   )
 
+  override val anonymousAccessiblePaths = Seq("/maven")
+
   override val systemSettingMenus: Seq[Context => Option[Link]] = Seq(
     _ => Some(Link("maven", "Maven repositories", "admin/maven", Some("package")))
   )

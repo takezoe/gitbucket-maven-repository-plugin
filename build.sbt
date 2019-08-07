@@ -1,7 +1,7 @@
 name := "gitbucket-maven-repository-plugin"
 organization := "io.github.gitbucket"
-version := "1.4.1"
-scalaVersion := "2.12.8"
-gitbucketVersion := "4.30.1"
+version := "1.5.0"
+scalaVersion := "2.13.0"
+gitbucketVersion := "4.32.0"
 scalacOptions += "-deprecation"
 resolvers += Resolver.mavenLocal

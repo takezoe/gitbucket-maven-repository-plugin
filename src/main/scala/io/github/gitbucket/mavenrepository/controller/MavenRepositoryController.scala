@@ -8,13 +8,13 @@ import gitbucket.core.controller.ControllerBase
 import gitbucket.core.model.Account
 import gitbucket.core.service.AccountService
 import gitbucket.core.util.{AdminAuthenticator, AuthUtil, FileUtil}
-import gitbucket.core.util.SyntaxSugars.using
 import gitbucket.core.util.Implicits._
 import io.github.gitbucket.mavenrepository.service.MavenRepositoryService
 import org.apache.commons.io.{FileUtils, IOUtils}
 import org.scalatra.forms._
 import org.scalatra.i18n.Messages
 import org.scalatra.{ActionResult, NotAcceptable, Ok}
+import scala.util.Using
 
 class MavenRepositoryController extends ControllerBase with AccountService with MavenRepositoryService
   with AdminAuthenticator {
@@ -111,7 +111,7 @@ class MavenRepositoryController extends ControllerBase with AccountService with 
         case f if f.exists && f.isFile =>
           contentType = FileUtil.getMimeType(path)
           response.setContentLength(file.length.toInt)
-          using(new FileInputStream(file)){ in =>
+          Using.resource(new FileInputStream(file)){ in =>
             IOUtils.copy(in, response.getOutputStream)
           }
 
@@ -158,7 +158,7 @@ class MavenRepositoryController extends ControllerBase with AccountService with 
       if(!parent.exists){
         parent.mkdirs()
       }
-      using(new FileOutputStream(file)){ out =>
+      Using.resource(new FileOutputStream(file)){ out =>
         IOUtils.copy(request.getInputStream, out)
       }
       Ok()

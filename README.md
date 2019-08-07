@@ -122,3 +122,28 @@ Also you need to add authentication settings in `~/.m2/settings.xml` (replace us
    ...
 </settings>
 ```
+
+### Gradle
+
+To publish your artifacts to a Maven repo hosted by **this** GitBucket plug-in, only the urls 
+in your `uploadArchives.repositories` section of your `build.gradle` need to be changed (using your installation's URLs):
+```groovy
+// ...
+def mvnUser     = hasProperty("mvnUser")     ? mvnUser     : "no_user"
+def mvnPassword = hasProperty("mvnPassword") ? mvnPassword : "no_pwd" 
+// ...
+uploadArchives {
+    repositories {
+        mavenDeployer {
+            repository(url:"http://localhost:8080/maven/releases") {
+                authentication(userName: mvnUser, password: mvnPassword)
+            }
+            snapshotRepository(url: "http://localhost:8080/maven/snapshots") {
+                authentication(userName: mvnUser, password: mvnPassword)
+            }
+    }
+ }
+}
+// ...
+```
+where `mvnUser` and `mvnPassword` are set in your `~/.gradle/gradle.properties`

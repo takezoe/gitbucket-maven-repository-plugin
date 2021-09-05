@@ -10,7 +10,7 @@ In default, following Maven repositories become available by installing this plu
 - `http(s)://GITBUCKET_HOST/maven/snapshots`
 
 You can deploy artifacts to these repositories via WebDAV with your GitBucket account.
- 
+
 Also you can deploy via SSH (SCP) with public key authentication using keys registered in GitBucket. In this case, use following configurations to connect via SSH:
 
 - Host: Hostname of GitBucket
@@ -27,6 +27,7 @@ You can specify whether artifacts are overwritable for each repository. In addit
 
 Plugin version | GitBucket version
 :--------------|:--------------------
+1.7.x          | 4.36.x -
 1.6.x          | 4.35.x -
 1.5.x          | 4.32.x -
 1.4.x          | 4.30.x -

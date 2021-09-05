@@ -82,11 +82,19 @@ class MavenRepositoryController extends ControllerBase with AccountService with 
     val files = multiParams("files")
 
     files.foreach { file =>
-      val f = new File(s"${RegistryPath}/${name}${path}${file}")
+      val fullPath = if (path.nonEmpty) {
+        s"${RegistryPath}/${name}/${path}/${file}"
+      } else {
+        s"${RegistryPath}/${name}/${file}"
+      }
+      val f = new File(fullPath)
       FileUtils.deleteQuietly(f)
     }
-
-    redirect(s"/maven/${name}${path}")
+    if (path.nonEmpty) {
+      redirect(s"/maven/${name}/${path}/")
+    } else {
+      redirect(s"/maven/${name}/")
+    }
   })
 
   get("/maven/:name"){

@@ -6,7 +6,7 @@
       <form method="POST" action="@context.path/admin/maven/@name/_deletefiles">
         @context.loginAccount.collect { case account if account.isAdmin =>
           <input type="submit" value="Delete" class="btn btn-danger pull-right" id="delete">
-          <input type="hidden" name="path" value="/@path">
+          <input type="hidden" name="path" value="@path">
         }
         <h1>
           <a href="@context.baseUrl/maven/@name/">@name</a>

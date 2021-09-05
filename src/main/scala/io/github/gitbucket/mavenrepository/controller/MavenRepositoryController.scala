@@ -15,6 +15,7 @@ import org.scalatra.forms._
 import org.scalatra.i18n.Messages
 import org.scalatra.{ActionResult, NotAcceptable, Ok}
 import scala.util.Using
+import org.scalatra.BadRequest
 
 class MavenRepositoryController extends ControllerBase with AccountService with MavenRepositoryService
   with AdminAuthenticator {
@@ -77,8 +78,8 @@ class MavenRepositoryController extends ControllerBase with AccountService with 
   }
 
   post("/admin/maven/:name/_deletefiles")(adminOnly {
-    val name = params("name")
-    val path = params("path")
+    val name  = params("name")
+    val path  = validatePath(params("path"))
     val files = multiParams("files")
 
     files.foreach { file =>
@@ -102,7 +103,8 @@ class MavenRepositoryController extends ControllerBase with AccountService with 
   }
 
   get("/maven/:name/*"){
-    download(params("name"), multiParams("splat").head)
+    val path = validatePath(multiParams("splat").head)
+    download(params("name"), path)
   }
 
   private def download(name: String, path: String) = {
@@ -145,6 +147,7 @@ class MavenRepositoryController extends ControllerBase with AccountService with 
 
   put("/maven/:name/*"){
     val name = params("name")
+    val path = validatePath(multiParams("splat").head)
 
     val result = for {
       // Find registry
@@ -152,7 +155,6 @@ class MavenRepositoryController extends ControllerBase with AccountService with 
       // Basic authentication
       _ <- if(registry.isPrivate){ basicAuthentication().map(x => Some(x)) } else Right(None)
       // Overwrite check
-      path = multiParams("splat").head
       file = new File(s"${RegistryPath}/${name}/${path}")
       _    <- if(file.getName == "maven-metadata.xml" || file.getName.startsWith("maven-metadata.xml.")){
                 Right(())
@@ -179,17 +181,15 @@ class MavenRepositoryController extends ControllerBase with AccountService with 
   // delete artifacts, only if the registry is overwritable
   delete("/maven/:name/*") {
     val name = params("name")
+    val path = validatePath(multiParams("splat").head)
+
     val result = for {
       registry <- getMavenRepository(name).toRight(NotFound())
-      _<- basicAuthentication()
-      path = multiParams("splat").head
-      file = Paths.get(RegistryPath, name, path)
-      repoBase = Paths.get(RegistryPath, registry.name)
-      _ <- if (!Files.exists(file) || !registry.overwrite) {
-        Left(NotAcceptable())
-      } else {
-        Right(())
-      }
+      _        <- basicAuthentication()
+      path     =  multiParams("splat").head
+      file     =  Paths.get(RegistryPath, name, path)
+      repoBase =  Paths.get(RegistryPath, registry.name)
+      _        <- if (!Files.exists(file) || !registry.overwrite) Left(NotAcceptable()) else Right(())
     } yield {
       if (Files.isSameFile(repoBase, file)) {
         // clean up repository
@@ -212,5 +212,12 @@ class MavenRepositoryController extends ControllerBase with AccountService with 
     override def validate(name: String, value: String, messages: Messages): Option[String] = {
       getMavenRepository(value).map { _ => "Repository already exist." }
     }
+  }
+
+  private def validatePath(path: String): String = {
+    if (path != null && path.contains("..")) {
+      halt(BadRequest())
+    }
+    path
   }
 }

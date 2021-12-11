@@ -5,3 +5,6 @@ scalaVersion := "2.13.7"
 gitbucketVersion := "4.37.0"
 scalacOptions += "-deprecation"
 resolvers += Resolver.mavenLocal
+libraryDependencies ++= Seq(
+  "org.apache.sshd" % "sshd-scp" % "2.8.0"
+)

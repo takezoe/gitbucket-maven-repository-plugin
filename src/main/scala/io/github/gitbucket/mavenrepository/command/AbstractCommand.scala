@@ -4,6 +4,7 @@ import java.io.{InputStream, OutputStream}
 
 import org.apache.sshd.server.command.Command
 import org.apache.sshd.server.{Environment, ExitCallback}
+import org.apache.sshd.server.channel.ChannelSession
 
 abstract class AbstractCommand extends Command {
 
@@ -18,7 +19,7 @@ abstract class AbstractCommand extends Command {
   override def setOutputStream(out: OutputStream): Unit = this.out = out
   override def setInputStream(in: InputStream): Unit = this.in = in
   override def setExitCallback(callback: ExitCallback): Unit = this.callback = callback
-  override def start(env: Environment): Unit = {
+  override def start(session: ChannelSession, env: Environment): Unit = {
     val exitCode = execute()
     out.flush()
 
@@ -28,6 +29,6 @@ abstract class AbstractCommand extends Command {
 
     callback.onExit(exitCode)
   }
-  override def destroy(): Unit = {}
+  override def destroy(session: ChannelSession): Unit = {}
   protected def execute(): Int
 }

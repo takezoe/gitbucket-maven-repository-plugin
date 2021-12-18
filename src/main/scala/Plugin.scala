@@ -1,6 +1,6 @@
 import java.io.{File, IOException, OutputStream}
 import java.nio.file.{Files, OpenOption, Path}
-import java.util
+import java.nio.file.attribute.PosixFilePermission
 
 import gitbucket.core.controller.Context
 import gitbucket.core.plugin.Link
@@ -12,9 +12,10 @@ import io.github.gitbucket.mavenrepository.controller.MavenRepositoryController
 import io.github.gitbucket.mavenrepository.service.MavenRepositoryService
 import io.github.gitbucket.solidbase.migration.{LiquibaseMigration, Migration}
 import io.github.gitbucket.solidbase.model.Version
-import org.apache.sshd.common.scp.helpers.DefaultScpFileOpener
+import org.apache.sshd.scp.common.helpers.DefaultScpFileOpener
+import org.apache.sshd.scp.server.ScpCommand
 import org.apache.sshd.common.session.Session
-import org.apache.sshd.server.scp.ScpCommand
+import org.apache.sshd.server.channel.ChannelSession
 
 class Plugin extends gitbucket.core.plugin.Plugin with MavenRepositoryService {
   override val pluginId: String = "maven-repository"
@@ -25,7 +26,7 @@ class Plugin extends gitbucket.core.plugin.Plugin with MavenRepositoryService {
     new Version("1.0.1"),
     new Version("1.1.0",
       new LiquibaseMigration("update/gitbucket-maven-repository_1.1.0.xml"),
-      (moduleId: String, version: String, context: util.Map[String, AnyRef]) => {
+      (moduleId: String, version: String, context: java.util.Map[String, AnyRef]) => {
         new File(s"${RegistryPath}/releases").mkdirs()
         new File(s"${RegistryPath}/snapshots").mkdirs()
       }
@@ -42,7 +43,7 @@ class Plugin extends gitbucket.core.plugin.Plugin with MavenRepositoryService {
   )
 
   override val sshCommandProviders = Seq({
-    case command: String if checkCommand(command) => {
+    case command: String if checkCommand(command) => (session: ChannelSession) => {
       val index        = command.indexOf('/')
       val path         = command.substring(index + "/maven".length)
       val registryName = path.split("/")(1)
@@ -50,17 +51,25 @@ class Plugin extends gitbucket.core.plugin.Plugin with MavenRepositoryService {
       val fullPath     = s"${RegistryPath}/${path}"
 
       if(command.startsWith("scp")){
-        new ScpCommand(s"scp -t -d ${fullPath}", null, 1024 * 128, 1024 * 128, new DefaultScpFileOpener(){
-          override def openWrite(session: Session, file: Path, options: OpenOption*): OutputStream = {
-            val fileName = file.getFileName.toString
-            if(fileName == "maven-metadata.xml" || fileName.startsWith("maven-metadata.xml.")){
-              // accept
-            } else if(registry.overwrite == false && Files.exists(file)){
-              throw new IOException("Rejected.")
+        new ScpCommand(
+          session,
+          s"scp -t -d ${fullPath}", 
+          null,       // executorService
+          1024 * 128, // sendSize
+          1024 * 128, // receiveSize
+          new DefaultScpFileOpener(){
+            override def openWrite(session: Session, file: Path, size: Long, permissions: java.util.Set[PosixFilePermission], options: OpenOption*): OutputStream = {
+              val fileName = file.getFileName.toString
+              if(fileName == "maven-metadata.xml" || fileName.startsWith("maven-metadata.xml.")){
+                // accept
+              } else if(registry.overwrite == false && Files.exists(file)){
+                throw new IOException("Rejected.")
+              }
+              super.openWrite(session, file, size, permissions, options: _*)
             }
-            super.openWrite(session, file, options: _*)
-          }
-        }, null)
+          },
+          null // eventListener
+        )
       } else if(command.startsWith("mkdir")){
         new MkdirCommand(new File(fullPath))
       } else {

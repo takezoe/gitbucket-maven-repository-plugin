@@ -27,6 +27,7 @@ You can specify whether artifacts are overwritable for each repository. In addit
 
 Plugin version | GitBucket version
 :--------------|:--------------------
+1.8.x          | 4.37.1 -
 1.7.x          | 4.36.x -
 1.6.x          | 4.35.x -
 1.5.x          | 4.32.x -

@@ -15,6 +15,7 @@ import io.github.gitbucket.solidbase.model.Version
 import org.apache.sshd.scp.common.helpers.DefaultScpFileOpener
 import org.apache.sshd.scp.server.ScpCommand
 import org.apache.sshd.common.session.Session
+import org.apache.sshd.server.channel.ChannelSession
 
 class Plugin extends gitbucket.core.plugin.Plugin with MavenRepositoryService {
   override val pluginId: String = "maven-repository"
@@ -42,7 +43,7 @@ class Plugin extends gitbucket.core.plugin.Plugin with MavenRepositoryService {
   )
 
   override val sshCommandProviders = Seq({
-    case command: String if checkCommand(command) => {
+    case command: String if checkCommand(command) => (session: ChannelSession) => {
       val index        = command.indexOf('/')
       val path         = command.substring(index + "/maven".length)
       val registryName = path.split("/")(1)
@@ -51,7 +52,7 @@ class Plugin extends gitbucket.core.plugin.Plugin with MavenRepositoryService {
 
       if(command.startsWith("scp")){
         new ScpCommand(
-          null, // TODO Fix this parameter to take from GitBucket core: https://github.com/gitbucket/gitbucket/pull/2941
+          session,
           s"scp -t -d ${fullPath}", 
           null,       // executorService
           1024 * 128, // sendSize

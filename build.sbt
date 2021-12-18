@@ -1,6 +1,6 @@
 name := "gitbucket-maven-repository-plugin"
 organization := "io.github.gitbucket"
-version := "1.8.0-SNAPSHOT"
+version := "1.8.0"
 scalaVersion := "2.13.7"
 gitbucketVersion := "4.37.1"
 scalacOptions += "-deprecation"

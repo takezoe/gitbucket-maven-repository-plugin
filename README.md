@@ -1,4 +1,4 @@
-gitbucket-maven-repository-plugin [![build](https://github.com/takezoe/gitbucket-maven-repository-plugin/workflows/build/badge.svg?branch=master)](https://github.com/takezoe/gitbucket-maven-repository-plugin/actions?query=workflow%3Abuild+branch%3Amaster)
+gitbucket-maven-repository-plugin [![build](https://github.com/takezoe/gitbucket-maven-repository-plugin/actions/workflows/build.yml/badge.svg)](https://github.com/takezoe/gitbucket-maven-repository-plugin/actions/workflows/build.yml)
 ========
 A GitBucket plugin that provides Maven repository hosting on GitBucket.
 

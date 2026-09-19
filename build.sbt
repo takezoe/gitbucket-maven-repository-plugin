@@ -1,12 +1,15 @@
 name := "gitbucket-maven-repository-plugin"
 organization := "io.github.gitbucket"
-version := "1.8.0"
-scalaVersion := "2.13.7"
-gitbucketVersion := "4.37.1"
+version := "1.9.0"
+scalaVersion := "2.13.18"
+gitbucketVersion := "4.47.0"
 scalacOptions += "-deprecation"
 resolvers += Resolver.mavenLocal
 libraryDependencies ++= Seq(
-  "org.apache.sshd" % "sshd-scp" % "2.8.0"
+  "org.apache.sshd" % "sshd-scp" % "2.19.0",
+  "org.scalatest" %% "scalatest-funsuite"       % "3.2.20" % "test",
+  "org.scalatra"  %% "scalatra-scalatest-javax" % "3.2.0"  % "test",
+  "org.mockito"   % "mockito-core"              % "5.23.0" % "test"
 )
 
 assembly / assemblyMergeStrategy := {

@@ -62,6 +62,7 @@ class MavenRepositoryController extends ControllerBase with AccountService with 
   post("/admin/maven/:name/_delete")(adminOnly {
     deleteRegistry(params("name"))
     redirect("/admin/maven")
+    ()
   })
 
   private def basicAuthentication(): Either[ActionResult, Account] = {
@@ -96,6 +97,7 @@ class MavenRepositoryController extends ControllerBase with AccountService with 
     } else {
       redirect(s"/maven/${name}/")
     }
+    ()
   })
 
   get("/maven/:name"){

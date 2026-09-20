@@ -41,7 +41,8 @@ class Plugin extends gitbucket.core.plugin.Plugin with MavenRepositoryService {
     new Version("1.6.0"),
     new Version("1.7.0"),
     new Version("1.8.0"),
-    new Version("1.9.0")
+    new Version("1.9.0"),
+    new Version("1.10.0")
   )
 
   override val sshCommandProviders = Seq({

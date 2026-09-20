@@ -45,7 +45,7 @@ class MavenRepositoryController extends ControllerBase with AccountService with 
     gitbucket.mavenrepository.html.form(None)
   })
 
-  post("/admin/maven/_new", repositoryCreateForm)(adminOnly { form =>
+  post("/admin/maven/_new", repositoryCreateForm)(adminOnlyWithForm { form =>
     createRegistry(form.name, form.description, form.overwrite, form.isPrivate)
     redirect("/admin/maven")
   })
@@ -54,7 +54,7 @@ class MavenRepositoryController extends ControllerBase with AccountService with 
     gitbucket.mavenrepository.html.form(getMavenRepository(params("name")))
   })
 
-  post("/admin/maven/:name/_edit", repositoryEditForm)(adminOnly { form =>
+  post("/admin/maven/:name/_edit", repositoryEditForm)(adminOnlyWithForm { form =>
     updateRegistry(params("name"), form.description, form.overwrite, form.isPrivate)
     redirect("/admin/maven")
   })
@@ -62,7 +62,6 @@ class MavenRepositoryController extends ControllerBase with AccountService with 
   post("/admin/maven/:name/_delete")(adminOnly {
     deleteRegistry(params("name"))
     redirect("/admin/maven")
-    ()
   })
 
   private def basicAuthentication(): Either[ActionResult, Account] = {
@@ -97,7 +96,6 @@ class MavenRepositoryController extends ControllerBase with AccountService with 
     } else {
       redirect(s"/maven/${name}/")
     }
-    ()
   })
 
   get("/maven/:name"){

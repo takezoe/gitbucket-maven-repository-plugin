@@ -3,15 +3,22 @@ package io.github.gitbucket.mavenrepository.controller
 import gitbucket.core.controller.Context
 import gitbucket.core.model.Account
 import gitbucket.core.service.SystemSettingsService
+import gitbucket.core.service.SystemSettingsService.{BasicBehavior, SystemSettings}
+import gitbucket.core.util.Keys
+import io.github.gitbucket.mavenrepository.{RegistryPath, TestDatabase}
+import io.github.gitbucket.mavenrepository.model.Profile.profile.blockingApi._
+import io.github.gitbucket.mavenrepository.service.MavenRepositoryService
 import org.mockito.Mockito._
 import org.scalatest.matchers.should.Matchers.{convertToAnyShouldWrapper, equal}
 import org.scalatra.test.scalatest.ScalatraFunSuite
 
-import java.util.Date
+import java.nio.charset.StandardCharsets
+import java.nio.file.{Files, Paths}
+import java.util.{Base64, Date}
+import javax.servlet.{Filter, FilterChain, ServletRequest, ServletResponse}
 
 // Covers only what resolves before any registry/DB lookup: the admin-only gate and the
-// path-traversal guard. Behavior that needs a real registry lookup (private-repo auth,
-// overwrite protection, WebDAV round trips) is covered by the live smoke test instead.
+// path-traversal guard. Behavior that needs a registry lookup is in MavenRepositoryControllerWithDatabaseTests.
 class MavenRepositoryControllerWithoutLoginTests extends ScalatraFunSuite {
   addFilter(new MavenRepositoryController() {
     override implicit val context: Context = MavenRepositoryControllerTest.buildContext(None)
@@ -79,12 +86,168 @@ class MavenRepositoryControllerWithNonAdminTests extends ScalatraFunSuite {
   }
 }
 
-object MavenRepositoryControllerTest {
-  private val systemSettings = mock(classOf[SystemSettingsService.SystemSettings])
+// Runs against a database created by the plugin's migrations, so the default `releases` and `snapshots`
+// repositories exist and are public. Anonymous access is disabled for the instance.
+class MavenRepositoryControllerWithDatabaseTests extends ScalatraFunSuite with MavenRepositoryService {
+  private implicit val session: Session = TestDatabase.create().createSession()
+  private var loginAccount: Option[Account] = None
 
-  def buildContext(loginAccount: Option[Account]): Context = {
+  // Stands in for GitBucket's TransactionFilter, which provides the controller's DB session.
+  addFilter(new Filter {
+    override def doFilter(request: ServletRequest, response: ServletResponse, chain: FilterChain): Unit = {
+      request.setAttribute(Keys.Request.DBSession, session)
+      chain.doFilter(request, response)
+    }
+  }, "/*")
+
+  addFilter(new MavenRepositoryController() {
+    override implicit def context: Context =
+      MavenRepositoryControllerTest.buildContext(loginAccount, allowAnonymousAccess = false)
+
+    override def authenticate(settings: SystemSettings, userName: String, password: String)
+                             (implicit s: Session): Option[Account] =
+      if (userName == "test" && password == "secret") Some(MavenRepositoryControllerTest.buildAccount(isAdmin = false))
+      else None
+  }, "/*")
+
+  override def afterAll(): Unit = {
+    super.afterAll()
+    session.close()
+  }
+
+  private def basicAuth(user: String, password: String): Map[String, String] =
+    Map("Authorization" -> ("Basic " + Base64.getEncoder.encodeToString(s"$user:$password".getBytes(StandardCharsets.UTF_8))))
+
+  private def asAdmin[A](action: => A): A = {
+    loginAccount = Some(MavenRepositoryControllerTest.buildAccount(isAdmin = true))
+    try action finally loginAccount = None
+  }
+
+  private def artifact(registry: String, path: String) = Paths.get(RegistryPath, registry, path)
+
+  test("PUT to a public repository without credentials is unauthorized and writes nothing") {
+    put("/maven/snapshots/anon/probe.txt", "x".getBytes) {
+      status should equal(401)
+      header("WWW-Authenticate") should equal("Basic realm=\"GitBucket Maven Repository\"")
+    }
+    Files.exists(artifact("snapshots", "anon/probe.txt")) should equal(false)
+  }
+
+  test("PUT to a public repository with wrong credentials is unauthorized") {
+    put("/maven/snapshots/anon/probe.txt", "x".getBytes, basicAuth("test", "wrong")) {
+      status should equal(401)
+    }
+    Files.exists(artifact("snapshots", "anon/probe.txt")) should equal(false)
+  }
+
+  test("PUT to a public repository with credentials stores the file") {
+    put("/maven/snapshots/auth/probe.txt", "x".getBytes, basicAuth("test", "secret")) {
+      status should equal(200)
+    }
+    Files.readString(artifact("snapshots", "auth/probe.txt")) should equal("x")
+  }
+
+  test("GET from a public repository works without credentials") {
+    Files.createDirectories(artifact("releases", "pub"))
+    Files.writeString(artifact("releases", "pub/a.txt"), "public")
+    get("/maven/releases/pub/a.txt") {
+      status should equal(200)
+      body should equal("public")
+    }
+  }
+
+  test("GET from a private repository needs credentials") {
+    createRegistry("internal", None, overwrite = false, isPrivate = true)
+    Files.writeString(artifact("internal", "a.txt"), "private")
+    get("/maven/internal/a.txt") {
+      status should equal(401)
+    }
+    get("/maven/internal/a.txt", headers = basicAuth("test", "secret")) {
+      status should equal(200)
+      body should equal("private")
+    }
+  }
+
+  test("DELETE of a single file removes it and its then-empty directory") {
+    Files.createDirectories(artifact("snapshots", "del/one"))
+    Files.writeString(artifact("snapshots", "del/one/a.jar"), "a")
+    delete("/maven/snapshots/del/one/a.jar", headers = basicAuth("test", "secret")) {
+      status should equal(200)
+    }
+    Files.exists(artifact("snapshots", "del/one/a.jar")) should equal(false)
+    Files.exists(artifact("snapshots", "del/one")) should equal(false)
+  }
+
+  test("DELETE of a directory removes it with its content") {
+    Files.createDirectories(artifact("snapshots", "del/dir"))
+    Files.writeString(artifact("snapshots", "del/dir/a.jar"), "a")
+    delete("/maven/snapshots/del/dir", headers = basicAuth("test", "secret")) {
+      status should equal(200)
+    }
+    Files.exists(artifact("snapshots", "del/dir")) should equal(false)
+  }
+
+  test("DELETE without credentials is unauthorized") {
+    Files.createDirectories(artifact("snapshots", "del/anon"))
+    Files.writeString(artifact("snapshots", "del/anon/a.jar"), "a")
+    delete("/maven/snapshots/del/anon/a.jar") {
+      status should equal(401)
+    }
+    Files.exists(artifact("snapshots", "del/anon/a.jar")) should equal(true)
+  }
+
+  test("making a private repository public must be confirmed while anonymous access is disabled") {
+    createRegistry("confirm-edit", None, overwrite = false, isPrivate = true)
+    asAdmin {
+      post("/admin/maven/confirm-edit/_edit/validate", "description" -> "x") {
+        body should include("confirmPublic")
+      }
+      post("/admin/maven/confirm-edit/_edit", "description" -> "x", "isPrivate" -> "false", "confirmPublic" -> "false") {
+        status should not equal(302)
+      }
+      getMavenRepository("confirm-edit").map(_.isPrivate) should equal(Some(true))
+
+      post("/admin/maven/confirm-edit/_edit", "description" -> "x", "confirmPublic" -> "true") {
+        status should equal(302)
+      }
+      getMavenRepository("confirm-edit").map(_.isPrivate) should equal(Some(false))
+    }
+  }
+
+  test("creating a public repository must be confirmed while anonymous access is disabled") {
+    asAdmin {
+      post("/admin/maven/_new", "name" -> "confirm-new") {
+        status should not equal(302)
+      }
+      getMavenRepository("confirm-new") should equal(None)
+
+      post("/admin/maven/_new", "name" -> "confirm-new", "isPrivate" -> "true") {
+        status should equal(302)
+      }
+      getMavenRepository("confirm-new").map(_.isPrivate) should equal(Some(true))
+    }
+  }
+
+  test("editing a repository that is already public needs no confirmation") {
+    asAdmin {
+      post("/admin/maven/releases/_edit", "description" -> "Releases") {
+        status should equal(302)
+      }
+      getMavenRepository("releases").flatMap(_.description) should equal(Some("Releases"))
+    }
+  }
+}
+
+object MavenRepositoryControllerTest {
+  def buildContext(loginAccount: Option[Account], allowAnonymousAccess: Boolean = true): Context = {
+    val basicBehavior = mock(classOf[BasicBehavior])
+    when(basicBehavior.allowAnonymousAccess).thenReturn(allowAnonymousAccess)
+    val systemSettings = mock(classOf[SystemSettingsService.SystemSettings])
+    when(systemSettings.basicBehavior).thenReturn(basicBehavior)
+
     val context = mock(classOf[Context])
     when(context.baseUrl).thenReturn("http://localhost:8080")
+    when(context.path).thenReturn("")
     when(context.loginAccount).thenReturn(loginAccount)
     when(context.settings).thenReturn(systemSettings)
     context

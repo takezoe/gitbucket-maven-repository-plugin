@@ -5,7 +5,7 @@
     <div class="content body">
       <form method="POST" action="@context.path/admin/maven/@name/_deletefiles">
         @context.loginAccount.collect { case account if account.isAdmin =>
-          <input type="submit" value="Delete" class="btn btn-danger pull-right" id="delete">
+          <input type="button" value="Delete" class="btn btn-danger pull-right" id="delete" disabled>
           <input type="hidden" name="path" value="@path">
         }
         <h1>
@@ -64,19 +64,32 @@
           }
         </table>
       </form>
+      @context.loginAccount.collect { case account if account.isAdmin =>
+        @gitbucket.mavenrepository.html.confirm("confirm-delete-files", "Delete"){
+          Delete <span class="confirm-count"></span>?
+        }{
+          <ul class="confirm-files"></ul>
+          <p>There is no going back.</p>
+        }
+      }
     </div>
   </div>
 }
 @context.loginAccount.collect { case account if account.isAdmin =>
 <script>
 $(function () {
+  var checkboxes = $('input[name=files]');
+  checkboxes.change(function(){
+    $('#delete').prop('disabled', checkboxes.filter(':checked').length === 0);
+  }).first().change(); // the browser may restore checked boxes
   $('#delete').click(function(){
-    if($('input[name=files]:checked').val()){
-      return confirm('Are you sure you want to delete checked files?');
-    } else {
-      alert('Please choose files to be deleted.');
-      return false;
-    }
+    var names = checkboxes.filter(':checked').map(function(){ return this.value; }).get();
+    $('#confirm-delete-files .confirm-count').text(names.length === 1 ? '"' + names[0] + '"' : names.length + ' files');
+    $('#confirm-delete-files .confirm-files').empty().append(names.map(function(name){ return $('<li>').text(name); })).toggle(names.length > 1);
+    $('#confirm-delete-files').modal('show');
+  });
+  $('#confirm-delete-files-ok').click(function(){
+    $('#delete').closest('form').submit();
   });
 });
 </script>

@@ -1,0 +1,17 @@
+@(id: String, confirmLabel: String)(title: Html)(body: Html)
+@* Bootstrap confirmation dialog; the page's script opens it and handles the click on #<id>-ok. *@
+<div class="modal fade" id="@id" role="dialog" tabindex="-1" aria-labelledby="@(id)-title">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close">&times;</button>
+        <h4 class="modal-title" id="@(id)-title">@title</h4>
+      </div>
+      <div class="modal-body">@body</div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-danger" id="@(id)-ok">@confirmLabel</button>
+      </div>
+    </div>
+  </div>
+</div>

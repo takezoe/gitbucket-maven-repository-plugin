@@ -42,7 +42,8 @@ class Plugin extends gitbucket.core.plugin.Plugin with MavenRepositoryService {
     new Version("1.7.0"),
     new Version("1.8.0"),
     new Version("1.9.0"),
-    new Version("1.10.0")
+    new Version("1.10.0"),
+    new Version("1.11.0")
   )
 
   override val sshCommandProviders = Seq({
@@ -102,6 +103,19 @@ class Plugin extends gitbucket.core.plugin.Plugin with MavenRepositoryService {
   )
 
   override val anonymousAccessiblePaths = Seq("/maven")
+
+  // Core's system settings page: public Maven repositories stay readable when anonymous access is denied.
+  override val javaScripts = Seq(".*/admin/system" -> """
+    |$(function(){
+    |  var radios = $('input[name="basicBehavior.allowAnonymousAccess"]');
+    |  var note = $('<div class="normal muted" style="display: none; margin-left: 20px;">' +
+    |    '<i class="octicon octicon-repo"></i> Public Maven repositories stay readable without signing in. ' +
+    |    '<a href="' + location.pathname.replace(/\/system$/, '/maven') + '">Maven repositories</a></div>');
+    |  radios.last().closest('fieldset').append(note);
+    |  radios.change(function(){ note.toggle(radios.filter(':checked').val() === 'false'); });
+    |  radios.filter(':checked').change();
+    |});
+    |""".stripMargin)
 
   override val systemSettingMenus: Seq[Context => Option[Link]] = Seq(
     _ => Some(Link("maven", "Maven repositories", "admin/maven", Some("package")))

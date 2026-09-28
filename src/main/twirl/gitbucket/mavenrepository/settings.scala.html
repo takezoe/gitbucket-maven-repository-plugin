@@ -1,4 +1,5 @@
 @(registries: Seq[io.github.gitbucket.mavenrepository.model.Registry])(implicit context: gitbucket.core.controller.Context)
+@defining(context.settings.basicBehavior.allowAnonymousAccess){ allowAnonymousAccess =>
 @gitbucket.core.html.main("Maven repositories") {
   @gitbucket.core.admin.html.menu("maven") {
     <div class="pull-right">
@@ -12,7 +13,7 @@
         <th width="100">Type</th>
         <th>URL</th>
         <th width="100">Overwrite</th>
-        <th width="100">Private</th>
+        <th width="100">Access</th>
         <th width="120"></th>
       </tr>
     @registries.map { registry =>
@@ -21,8 +22,17 @@
         <td>@registry.description</td>
         <td>Maven</td>
         <td><a href="@context.baseUrl/maven/@registry.name/" target="_blank">@context.baseUrl/maven/@registry.name/</a></td>
-        <td>@registry.overwrite</td>
-        <td>@registry.isPrivate</td>
+        <td>@if(registry.overwrite){Yes}else{No}</td>
+        <td>
+          @if(registry.isPrivate){
+            <i class="octicon octicon-lock"></i>&nbsp;Private
+          } else {
+            <i class="octicon octicon-repo"></i>&nbsp;Public
+            @if(!allowAnonymousAccess){
+              <i class="octicon octicon-alert" style="color:#BD2C00;" title="Readable without authentication, although anonymous access is disabled"></i>
+            }
+          }
+        </td>
         <td>
           <span style="white-space: nowrap;">
             <a href="@context.path/admin/maven/@registry.name/_edit" class="btn btn-default btn-sm">Edit</a>
@@ -33,16 +43,24 @@
     }
     </table>
     <form id="form" method="POST" action=""></form>
+    @gitbucket.mavenrepository.html.confirm("confirm-delete", "Delete repository"){
+      Delete &quot;<span class="confirm-name"></span>&quot;?
+    }{
+      <p>This deletes the repository and all its artifacts. There is no going back.</p>
+    }
   }
 }
 <script>
 $(function(){
   $('.delete-registry').click(function(e){
     var name = $(e.target).data('name');
-    if(confirm('Delete "' + name + '" repository. Are you sure?')){
-      $('#form').attr('action', '@context.path/admin/maven/' + name + '/_delete').submit();
-    }
+    $('#confirm-delete .confirm-name').text(name);
+    $('#confirm-delete-ok').data('name', name);
+    $('#confirm-delete').modal('show');
+  });
+  $('#confirm-delete-ok').click(function(){
+    $('#form').attr('action', '@context.path/admin/maven/' + $(this).data('name') + '/_delete').submit();
   });
 });
 </script>
-
+}

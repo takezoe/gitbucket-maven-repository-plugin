@@ -9,18 +9,18 @@ import gitbucket.core.model.Account
 import gitbucket.core.service.AccountService
 import gitbucket.core.util.{AdminAuthenticator, AuthUtil, FileUtil}
 import gitbucket.core.util.Implicits._
-import io.github.gitbucket.mavenrepository.model.Registry
-import io.github.gitbucket.mavenrepository.service.MavenRepositoryService
+import io.github.gitbucket.mavenrepository.model.{MavenToken, Registry}
+import io.github.gitbucket.mavenrepository.service.{MavenRepositoryService, MavenTokenService}
 import org.apache.commons.io.{FileUtils, IOUtils}
 import org.slf4j.LoggerFactory
 import org.scalatra.forms._
 import org.scalatra.i18n.Messages
-import org.scalatra.{ActionResult, NotAcceptable, Ok}
+import org.scalatra.{ActionResult, Forbidden, NotAcceptable, Ok}
 import scala.util.Using
 import org.scalatra.BadRequest
 
 class MavenRepositoryController extends ControllerBase with AccountService with MavenRepositoryService
-  with AdminAuthenticator {
+  with MavenTokenService with AdminAuthenticator {
 
   private val logger = LoggerFactory.getLogger(classOf[MavenRepositoryController])
 
@@ -79,7 +79,15 @@ class MavenRepositoryController extends ControllerBase with AccountService with 
 
 
   get("/admin/maven")(adminOnly {
-    gitbucket.mavenrepository.html.settings(getMavenRepositories())
+    gitbucket.mavenrepository.html.settings(getMavenRepositories(), getAllMavenTokens())
+  })
+
+  post("/admin/maven/_tokens/:id/_delete")(adminOnly {
+    params("id").toIntOption.flatMap(getMavenToken).foreach { token =>
+      deleteMavenToken(token.tokenId)
+      logger.info(s"Maven token '${token.note}' of ${token.userName} deleted by ${userName}")
+    }
+    redirect("/admin/maven")
   })
 
   get("/admin/maven/_new")(adminOnly {
@@ -116,23 +124,37 @@ class MavenRepositoryController extends ControllerBase with AccountService with 
     redirect("/admin/maven")
   })
 
-  // Browsing and downloading also accept the GitBucket session, so signed-in users get no Basic auth prompt.
-  // Uploads and deletes stay on Basic auth only.
-  private def sessionOrBasicAuthentication(): Either[ActionResult, Account] =
-    context.loginAccount.map(Right(_)).getOrElse(basicAuthentication())
+  // An authenticated client of the repositories, and the Maven token it used, if any.
+  private case class Client(account: Account, token: Option[MavenToken]) {
+    def name: String = account.userName + token.fold("")(t => s" (token '${t.note}')")
+  }
 
-  private def basicAuthentication(): Either[ActionResult, Account] = {
+  // Browsing and downloading also accept the GitBucket session, so signed-in users get no Basic auth prompt.
+  // Uploads and deletes need credentials.
+  private def sessionOrCredentials(): Either[ActionResult, Client] =
+    context.loginAccount.map(account => Right(Client(account, None))).getOrElse(credentials())
+
+  // Basic auth with the password or a Maven token, or a Maven token as bearer token.
+  private def credentials(): Either[ActionResult, Client] = {
+    def byToken(secret: String) = findMavenToken(secret).map { case (account, token) => Client(account, Some(token)) }
     request.header("Authorization").flatMap {
       case auth if auth.startsWith("Basic ") => {
-        val Array(username, password) = AuthUtil.decodeAuthHeader(auth).split(":", 2)
-        authenticate(context.settings, username, password)
+        val Array(username, secret) = AuthUtil.decodeAuthHeader(auth).split(":", 2)
+        // Tokens are recognized by their prefix, so they never reach the password check (and LDAP).
+        if (isMavenToken(secret)) byToken(secret).filter(_.account.userName == username)
+        else authenticate(context.settings, username, secret).map(Client(_, None))
       }
+      case auth if auth.startsWith("Bearer ") => Some(auth.substring(7).trim).filter(isMavenToken).flatMap(byToken)
       case _ => None
     }.toRight {
       response.setHeader("WWW-Authenticate", "Basic realm=\"GitBucket Maven Repository\"")
       org.scalatra.Unauthorized()
     }
   }
+
+  // Uploads and deletes: read-only tokens are refused.
+  private def writeCredentials(): Either[ActionResult, Client] =
+    credentials().filterOrElse(_.token.forall(_.canWrite), Forbidden())
 
   post("/admin/maven/:name/_deletefiles")(adminOnly {
     val name  = params("name")
@@ -172,7 +194,7 @@ class MavenRepositoryController extends ControllerBase with AccountService with 
       // Find registry
       registry <- getMavenRepository(name).toRight { NotFound() }
       // Basic authentication
-      _ <- if(registry.isPrivate){ sessionOrBasicAuthentication().map(x => Some(x)) } else Right(None)
+      _ <- if(registry.isPrivate){ sessionOrCredentials().map(x => Some(x)) } else Right(None)
       //path = multiParams("splat").head
       file = new File(s"${RegistryPath}/${name}/${path}")
     } yield {
@@ -212,8 +234,8 @@ class MavenRepositoryController extends ControllerBase with AccountService with 
     val result = for {
       // Find registry
       registry <- getMavenRepository(name).toRight { NotFound() }
-      // Basic authentication: uploads always need it, also for public repositories
-      account <- basicAuthentication()
+      // Uploads always need credentials, also for public repositories
+      client <- writeCredentials()
       // Overwrite check
       file = new File(s"${RegistryPath}/${name}/${path}")
       _    <- if(file.getName == "maven-metadata.xml" || file.getName.startsWith("maven-metadata.xml.")){
@@ -231,7 +253,7 @@ class MavenRepositoryController extends ControllerBase with AccountService with 
       Using.resource(new FileOutputStream(file)){ out =>
         IOUtils.copy(request.getInputStream, out)
       }
-      logger.debug(s"Maven repository '${name}': /${path} uploaded by ${account.userName}")
+      logger.debug(s"Maven repository '${name}': /${path} uploaded by ${client.name}")
       Ok()
     }
 
@@ -246,7 +268,7 @@ class MavenRepositoryController extends ControllerBase with AccountService with 
 
     val result = for {
       registry <- getMavenRepository(name).toRight(NotFound())
-      account  <- basicAuthentication()
+      client   <- writeCredentials()
       path     =  multiParams("splat").head
       file     =  Paths.get(RegistryPath, name, path)
       repoBase =  Paths.get(RegistryPath, registry.name)
@@ -263,7 +285,7 @@ class MavenRepositoryController extends ControllerBase with AccountService with 
           FileUtil.deleteDirectoryIfEmpty(parent.toFile)
         }
       }
-      logger.info(s"Maven repository '${name}': /${path} deleted by ${account.userName}")
+      logger.info(s"Maven repository '${name}': /${path} deleted by ${client.name}")
       Ok()
     }
 

@@ -31,11 +31,22 @@ Uploading and deleting artifacts always require a GitBucket login, also for publ
 Public repositories can be downloaded without a login even if anonymous access is denied in GitBucket's system
 settings. On such an instance, new repositories are private by default, and making one public asks for confirmation.
 
+### Maven tokens
+
+Instead of your GitBucket password, build tools can use a Maven token (since 1.12.0). Create one in your account
+settings under **Maven tokens**, and use it as the password together with your user name, or send it as
+`Authorization: Bearer <token>`. A token can be read-only or read-and-write, and can expire.
+
+Tokens only work for the Maven repositories, not for Git, the API or signing in. Accounts that sign in with
+OpenID Connect have no GitBucket password, so they need a token to use the repositories from build tools.
+Administrators see and can delete all tokens on the Maven repositories page.
+
 ## Compatibility
 
 Plugin version | GitBucket version
 :--------------|:--------------------
-1.11.x          | 4.48.x -
+1.12.x         | 4.48.x -
+1.11.x         | 4.48.x -
 1.10.x          | 4.48.x -
 1.9.x          | 4.47.x -
 1.8.x          | 4.37.1 -
@@ -116,7 +127,7 @@ Add distribution settings to your `pom.xml`:
 </project>
 ```
 
-Also you need to add authentication settings in `~/.m2/settings.xml` (replace username and password with your GitBucket account's one):
+Also you need to add authentication settings in `~/.m2/settings.xml` (replace username and password with your GitBucket account's one, or use a [Maven token](#maven-tokens) as the password):
 
 ```xml
 <settings>

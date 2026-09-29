@@ -1,5 +1,6 @@
 package io.github.gitbucket.mavenrepository
 
+import gitbucket.core.GitBucketCoreModule
 import gitbucket.core.plugin.Plugin
 import io.github.gitbucket.mavenrepository.model.Profile.profile.blockingApi._
 import io.github.gitbucket.solidbase.Solidbase
@@ -13,7 +14,7 @@ import java.util.UUID
 import scala.util.Using
 
 /**
- * In-memory H2 databases with the plugin's tables created by its own Solidbase migrations, as GitBucket does
+ * In-memory H2 databases created by GitBucket's and then the plugin's own Solidbase migrations, as GitBucket does
  * when it installs the plugin (so they also contain the default `releases` and `snapshots` repositories).
  */
 object TestDatabase {
@@ -35,8 +36,9 @@ object TestDatabase {
     Using.resource(DriverManager.getConnection(url, "sa", "sa")) { conn =>
       val db = new H2Database()
       db.setConnection(new JdbcConnection(conn))
-      new Solidbase().migrate(conn, Thread.currentThread.getContextClassLoader, db,
-        new Module(plugin.pluginId, plugin.versions: _*))
+      val classLoader = Thread.currentThread.getContextClassLoader
+      new Solidbase().migrate(conn, classLoader, db, GitBucketCoreModule)
+      new Solidbase().migrate(conn, classLoader, db, new Module(plugin.pluginId, plugin.versions: _*))
       // Liquibase turns auto-commit off; without this the inserted default repositories are rolled back on close.
       if (!conn.getAutoCommit) conn.commit()
     }

@@ -4,3 +4,4 @@ import gitbucket.core.model._
 
 object Profile extends CoreProfile
   with RegistryComponent
+  with MavenTokenComponent

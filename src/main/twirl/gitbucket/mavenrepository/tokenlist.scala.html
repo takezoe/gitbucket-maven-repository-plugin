@@ -1,0 +1,48 @@
+@(tokens: Seq[io.github.gitbucket.mavenrepository.model.MavenToken], showUser: Boolean, actionPath: String)(implicit context: gitbucket.core.controller.Context)
+@* Token table with delete buttons, for the account settings and the admin page. *@
+@import gitbucket.core.view.helpers
+<table class="table table-bordered table-hover" style="margin-bottom: 0px;">
+  <tr>
+    @if(showUser){<th>User</th>}
+    <th>Note</th>
+    <th>Access</th>
+    <th>Expires</th>
+    <th>Last used</th>
+    <th width="80"></th>
+  </tr>
+  @tokens.map { token =>
+    <tr>
+      @if(showUser){<td>@helpers.avatarLink(token.userName, 20) @helpers.user(token.userName)</td>}
+      <td>@token.note</td>
+      <td>@if(token.canWrite){Read and write}else{Read}</td>
+      <td>
+        @token.expires.map { expires =>
+          @helpers.date(expires)
+          @if(token.isExpired){<span class="label label-default">Expired</span>}
+        }.getOrElse{Never}
+      </td>
+      <td>@token.lastUsed.map(helpers.datetimeAgo).getOrElse("Never")</td>
+      <td>
+        <a href="javascript:void(0);" class="delete-token btn btn-danger btn-sm" data-id="@token.tokenId" data-note="@token.note">Delete</a>
+      </td>
+    </tr>
+  }
+</table>
+<form id="delete-token-form" method="POST" action=""></form>
+@gitbucket.mavenrepository.html.confirm("confirm-delete-token", "Delete token"){
+  Delete token &quot;<span class="confirm-name"></span>&quot;?
+}{
+  <p>Builds that use this token can no longer access the Maven repositories.</p>
+}
+<script>
+$(function(){
+  $('.delete-token').click(function(){
+    $('#confirm-delete-token .confirm-name').text($(this).data('note'));
+    $('#confirm-delete-token-ok').data('id', $(this).data('id'));
+    $('#confirm-delete-token').modal('show');
+  });
+  $('#confirm-delete-token-ok').click(function(){
+    $('#delete-token-form').attr('action', '@actionPath/' + $(this).data('id') + '/_delete').submit();
+  });
+});
+</script>

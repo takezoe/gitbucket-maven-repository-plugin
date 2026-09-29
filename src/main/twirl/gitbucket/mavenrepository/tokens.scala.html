@@ -1,0 +1,77 @@
+@(tokens: Seq[io.github.gitbucket.mavenrepository.model.MavenToken], newSecret: Option[String])(implicit context: gitbucket.core.controller.Context)
+@import gitbucket.core.view.helpers
+@defining(context.loginAccount.get.userName){ userName =>
+@gitbucket.core.html.main("Maven tokens"){
+  @gitbucket.core.account.html.menu("maventokens", userName, false){
+    <div class="panel panel-default">
+      <div class="panel-heading strong">Maven tokens</div>
+      <div class="panel-body">
+        <p class="muted">
+          Use a token instead of your password in Maven, Gradle or sbt, together with your user name.
+          Tokens only work for the Maven repositories: not for Git, the API or signing in.
+        </p>
+        @newSecret.map { secret =>
+          <div class="alert alert-info">Make sure to copy your new token now. You won't be able to see it again!</div>
+          <div style="width: 50%;">
+            @gitbucket.core.helper.html.copy("new-token", "new-token-copy", secret){
+              <input type="text" value="@secret" class="form-control input-sm" id="new-token" readonly>
+            }
+          </div>
+          <p class="muted" style="margin-top: 10px;">For example in Maven's <code>settings.xml</code>, with the <code>id</code> of your repository:</p>
+          <pre>&lt;server&gt;
+  &lt;id&gt;gitbucket&lt;/id&gt;
+  &lt;username&gt;@userName&lt;/username&gt;
+  &lt;password&gt;@secret&lt;/password&gt;
+&lt;/server&gt;</pre>
+        }
+        @if(tokens.isEmpty){
+          No tokens.
+        } else {
+          @gitbucket.mavenrepository.html.tokenlist(tokens, showUser = false, s"${context.path}/maven/_tokens")
+        }
+      </div>
+    </div>
+    <form method="POST" action="@context.path/maven/_tokens" validate="true" autocomplete="off">
+      <div class="panel panel-default">
+        <div class="panel-heading strong">Generate new token</div>
+        <div class="panel-body">
+          <fieldset>
+            <label for="note" class="strong">Note</label>
+            <div><span id="error-note" class="error"></span></div>
+            <input type="text" name="note" id="note" class="form-control" maxlength="100"/>
+            <p class="muted">What is this token for, e.g. "CI server"?</p>
+          </fieldset>
+          <fieldset>
+            <label class="strong">Access</label>
+            <div class="radio">
+              <label>
+                <input type="radio" name="canWrite" value="false" checked>
+                <span class="strong">Read</span>
+                <div class="normal muted">Download from private repositories.</div>
+              </label>
+            </div>
+            <div class="radio">
+              <label>
+                <input type="radio" name="canWrite" value="true">
+                <span class="strong">Read and write</span>
+                <div class="normal muted">Also deploy and delete artifacts.</div>
+              </label>
+            </div>
+          </fieldset>
+          <fieldset>
+            <label for="expiresInDays" class="strong">Expiration</label>
+            <div><span id="error-expiresInDays" class="error"></span></div>
+            <select name="expiresInDays" id="expiresInDays" class="form-control" style="width: auto; margin-bottom: 15px;">
+              <option value="30">30 days</option>
+              <option value="90" selected>90 days</option>
+              <option value="365">1 year</option>
+              <option value="0">No expiration</option>
+            </select>
+          </fieldset>
+          <input type="submit" class="btn btn-success" value="Generate token"/>
+        </div>
+      </div>
+    </form>
+  }
+}
+}

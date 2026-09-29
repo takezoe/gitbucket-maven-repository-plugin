@@ -4,6 +4,7 @@ import java.nio.file.attribute.PosixFilePermission
 
 import gitbucket.core.controller.Context
 import gitbucket.core.plugin.Link
+import gitbucket.core.ssh.PublicKeyAuthenticator
 import gitbucket.core.servlet.Database
 import gitbucket.core.model.Profile.profile.blockingApi._
 import io.github.gitbucket.mavenrepository._
@@ -16,8 +17,10 @@ import org.apache.sshd.scp.common.helpers.DefaultScpFileOpener
 import org.apache.sshd.scp.server.ScpCommand
 import org.apache.sshd.common.session.Session
 import org.apache.sshd.server.channel.ChannelSession
+import org.slf4j.LoggerFactory
 
 class Plugin extends gitbucket.core.plugin.Plugin with MavenRepositoryService {
+  private val logger = LoggerFactory.getLogger(classOf[MavenRepositoryController])
   override val pluginId: String = "maven-repository"
   override val pluginName: String = "Maven Repository Plugin"
   override val description: String = "Host Maven repository on GitBucket."
@@ -53,6 +56,8 @@ class Plugin extends gitbucket.core.plugin.Plugin with MavenRepositoryService {
       val registryName = path.split("/")(1)
       val registry     = Database() withTransaction { implicit session => getMavenRepository(registryName).get }
       val fullPath     = s"${RegistryPath}/${path}"
+      val userName     = PublicKeyAuthenticator.getAuthType(session.getServerSession)
+        .flatMap(PublicKeyAuthenticator.AuthType.userName).getOrElse("?")
 
       if(command.startsWith("scp")){
         new ScpCommand(
@@ -69,6 +74,7 @@ class Plugin extends gitbucket.core.plugin.Plugin with MavenRepositoryService {
               } else if(registry.overwrite == false && Files.exists(file)){
                 throw new IOException("Rejected.")
               }
+              logger.debug(s"Maven repository '${registryName}': ${file} uploaded via SCP by ${userName}")
               super.openWrite(session, file, size, permissions, options: _*)
             }
           },

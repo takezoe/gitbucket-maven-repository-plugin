@@ -25,7 +25,8 @@ object TestDatabase {
   private lazy val plugin =
     Class.forName("Plugin").getDeclaredConstructor().newInstance().asInstanceOf[Plugin]
 
-  def create(): Database = {
+  // Synchronized: test suites run in parallel, and concurrent Liquibase migrations can fail.
+  def create(): Database = synchronized {
     val url = s"jdbc:h2:mem:${UUID.randomUUID()};DB_CLOSE_DELAY=-1"
     Using.resource(DriverManager.getConnection(url, "sa", "sa")) { conn =>
       val db = new H2Database()

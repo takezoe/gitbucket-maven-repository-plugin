@@ -55,9 +55,21 @@ class MavenRepositoryController extends ControllerBase with AccountService with 
       Seq("confirmPublic" -> "Confirm that this repository should be readable without authentication.")
     } else Nil
 
-  private def logChange(message: String, registry: Registry, madePublic: Boolean): Unit = {
-    val text = s"Maven repository '${registry.name}' ${message} by ${context.loginAccount.map(_.userName).getOrElse("?")} " +
-      s"(${if (registry.isPrivate) "private" else "public"}, overwrite=${registry.overwrite})"
+  private def userName: String = context.loginAccount.map(_.userName).getOrElse("?")
+
+  private def access(registry: Registry): String = if (registry.isPrivate) "private" else "public"
+
+  private def describe(registry: Registry): String = s"${access(registry)}, overwrite=${registry.overwrite}"
+
+  private def describeChanges(before: Registry, after: Registry): String =
+    Seq(
+      Option.when(before.isPrivate != after.isPrivate)(s"${access(before)} -> ${access(after)}"),
+      Option.when(before.overwrite != after.overwrite)(s"overwrite ${before.overwrite} -> ${after.overwrite}"),
+      Option.when(before.description != after.description)("description changed")
+    ).flatten.mkString(", ")
+
+  private def logChange(message: String, registry: Registry, details: String, madePublic: Boolean): Unit = {
+    val text = s"Maven repository '${registry.name}' ${message} by ${userName} (${details})"
     if (madePublic && !context.settings.basicBehavior.allowAnonymousAccess) {
       logger.warn(s"${text}: public although anonymous access is disabled")
     } else {
@@ -76,7 +88,8 @@ class MavenRepositoryController extends ControllerBase with AccountService with 
 
   post("/admin/maven/_new", repositoryCreateForm)(adminOnlyWithForm { (form: RepositoryCreateForm) =>
     createRegistry(form.name, form.description, form.overwrite, form.isPrivate)
-    logChange("created", Registry(form.name, form.description, form.overwrite, form.isPrivate), madePublic = !form.isPrivate)
+    val registry = Registry(form.name, form.description, form.overwrite, form.isPrivate)
+    logChange("created", registry, describe(registry), madePublic = !form.isPrivate)
     redirect("/admin/maven")
   })
 
@@ -88,7 +101,9 @@ class MavenRepositoryController extends ControllerBase with AccountService with 
     getMavenRepository(params("name")).map { before =>
       updateRegistry(before.name, form.description, form.overwrite, form.isPrivate)
       val after = before.copy(description = form.description, overwrite = form.overwrite, isPrivate = form.isPrivate)
-      if (after != before) logChange("changed", after, madePublic = before.isPrivate && !after.isPrivate)
+      if (after != before) {
+        logChange("changed", after, describeChanges(before, after), madePublic = before.isPrivate && !after.isPrivate)
+      }
       redirect("/admin/maven")
     } getOrElse NotFound()
   })
@@ -96,7 +111,7 @@ class MavenRepositoryController extends ControllerBase with AccountService with 
   post("/admin/maven/:name/_delete")(adminOnly {
     getMavenRepository(params("name")).foreach { registry =>
       deleteRegistry(registry.name)
-      logChange("deleted", registry, madePublic = false)
+      logChange("deleted", registry, describe(registry), madePublic = false)
     }
     redirect("/admin/maven")
   })
@@ -132,6 +147,9 @@ class MavenRepositoryController extends ControllerBase with AccountService with 
       }
       val f = new File(fullPath)
       FileUtils.deleteQuietly(f)
+    }
+    if (files.nonEmpty) {
+      logger.info(s"Maven repository '${name}': ${files.mkString(", ")} in /${path} deleted by ${userName}")
     }
     if (path.nonEmpty) {
       redirect(s"/maven/${name}/${path}/")
@@ -195,7 +213,7 @@ class MavenRepositoryController extends ControllerBase with AccountService with 
       // Find registry
       registry <- getMavenRepository(name).toRight { NotFound() }
       // Basic authentication: uploads always need it, also for public repositories
-      _ <- basicAuthentication()
+      account <- basicAuthentication()
       // Overwrite check
       file = new File(s"${RegistryPath}/${name}/${path}")
       _    <- if(file.getName == "maven-metadata.xml" || file.getName.startsWith("maven-metadata.xml.")){
@@ -213,6 +231,7 @@ class MavenRepositoryController extends ControllerBase with AccountService with 
       Using.resource(new FileOutputStream(file)){ out =>
         IOUtils.copy(request.getInputStream, out)
       }
+      logger.debug(s"Maven repository '${name}': /${path} uploaded by ${account.userName}")
       Ok()
     }
 
@@ -227,7 +246,7 @@ class MavenRepositoryController extends ControllerBase with AccountService with 
 
     val result = for {
       registry <- getMavenRepository(name).toRight(NotFound())
-      _        <- basicAuthentication()
+      account  <- basicAuthentication()
       path     =  multiParams("splat").head
       file     =  Paths.get(RegistryPath, name, path)
       repoBase =  Paths.get(RegistryPath, registry.name)
@@ -244,6 +263,7 @@ class MavenRepositoryController extends ControllerBase with AccountService with 
           FileUtil.deleteDirectoryIfEmpty(parent.toFile)
         }
       }
+      logger.info(s"Maven repository '${name}': /${path} deleted by ${account.userName}")
       Ok()
     }
 

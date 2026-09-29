@@ -101,6 +101,11 @@ class MavenRepositoryController extends ControllerBase with AccountService with 
     redirect("/admin/maven")
   })
 
+  // Browsing and downloading also accept the GitBucket session, so signed-in users get no Basic auth prompt.
+  // Uploads and deletes stay on Basic auth only.
+  private def sessionOrBasicAuthentication(): Either[ActionResult, Account] =
+    context.loginAccount.map(Right(_)).getOrElse(basicAuthentication())
+
   private def basicAuthentication(): Either[ActionResult, Account] = {
     request.header("Authorization").flatMap {
       case auth if auth.startsWith("Basic ") => {
@@ -149,7 +154,7 @@ class MavenRepositoryController extends ControllerBase with AccountService with 
       // Find registry
       registry <- getMavenRepository(name).toRight { NotFound() }
       // Basic authentication
-      _ <- if(registry.isPrivate){ basicAuthentication().map(x => Some(x)) } else Right(None)
+      _ <- if(registry.isPrivate){ sessionOrBasicAuthentication().map(x => Some(x)) } else Right(None)
       //path = multiParams("splat").head
       file = new File(s"${RegistryPath}/${name}/${path}")
     } yield {

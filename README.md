@@ -24,7 +24,7 @@ It's possible to add more repositories and configure them at the administration 
 For each repository you can choose:
 
 - **Allow overwrite**: whether an existing artifact can be uploaded again.
-- **Private**: whether downloading and browsing require a GitBucket login (HTTP Basic authentication).
+- **Private**: whether downloading and browsing require a GitBucket login. Build tools send it with HTTP Basic authentication; users signed in to GitBucket can browse in the browser without a password prompt.
 
 Uploading and deleting artifacts always require a GitBucket login, also for public repositories (since 1.11.0).
 

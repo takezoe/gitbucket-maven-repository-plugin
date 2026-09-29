@@ -196,6 +196,26 @@ class MavenRepositoryControllerWithDatabaseTests extends ScalatraFunSuite with M
     Files.exists(artifact("snapshots", "del/anon/a.jar")) should equal(true)
   }
 
+  test("GET from a private repository works with the GitBucket session, PUT and DELETE don't") {
+    createRegistry("session", None, overwrite = true, isPrivate = true)
+    Files.writeString(artifact("session", "a.txt"), "private")
+    loginAccount = Some(MavenRepositoryControllerTest.buildAccount(isAdmin = false))
+    try {
+      get("/maven/session/a.txt") {
+        status should equal(200)
+        body should equal("private")
+      }
+      put("/maven/session/b.txt", "x".getBytes) {
+        status should equal(401)
+      }
+      delete("/maven/session/a.txt") {
+        status should equal(401)
+      }
+    } finally loginAccount = None
+    Files.exists(artifact("session", "b.txt")) should equal(false)
+    Files.exists(artifact("session", "a.txt")) should equal(true)
+  }
+
   test("making a private repository public must be confirmed while anonymous access is disabled") {
     createRegistry("confirm-edit", None, overwrite = false, isPrivate = true)
     asAdmin {

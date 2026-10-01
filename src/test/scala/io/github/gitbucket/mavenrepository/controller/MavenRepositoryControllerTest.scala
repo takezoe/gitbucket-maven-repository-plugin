@@ -25,6 +25,8 @@ import scala.jdk.CollectionConverters._
 // Covers only what resolves before any registry/DB lookup: the admin-only gate and the
 // path-traversal guard. Behavior that needs a registry lookup is in MavenRepositoryControllerWithDatabaseTests.
 class MavenRepositoryControllerWithoutLoginTests extends ScalatraFunSuite {
+  TestDatabase.useTestHome()
+
   addFilter(new MavenRepositoryController() {
     override implicit val context: Context = MavenRepositoryControllerTest.buildContext(None)
   }, "/*")
@@ -67,6 +69,8 @@ class MavenRepositoryControllerWithoutLoginTests extends ScalatraFunSuite {
 }
 
 class MavenRepositoryControllerWithNonAdminTests extends ScalatraFunSuite {
+  TestDatabase.useTestHome()
+
   addFilter(new MavenRepositoryController() {
     override implicit val context: Context =
       MavenRepositoryControllerTest.buildContext(Some(MavenRepositoryControllerTest.buildAccount(isAdmin = false)))

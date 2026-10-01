@@ -18,8 +18,12 @@ import scala.util.Using
  */
 object TestDatabase {
 
-  // Redirect RegistryPath away from the real ~/.gitbucket. Runs before anything reads it.
+  // Redirects RegistryPath (and core's GitBucketHome) away from the real ~/.gitbucket. Both are read once per JVM,
+  // so every suite has to initialize this object before it runs anything: see useTestHome().
   sys.props("gitbucket.home") = Files.createTempDirectory("mvn-repo-plugin-test").toString
+
+  /** Call first in suites without a database; creating one initializes the test home too. */
+  def useTestHome(): Unit = ()
 
   // Plugin.scala is in the default package, which Scala code in a package can't import.
   private lazy val plugin =

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<changeSet>
+  <createTable tableName="MVN_TOKEN">
+    <column name="TOKEN_ID" type="int" nullable="false" autoIncrement="true" unique="true" primaryKeyName="IDX_MVN_TOKEN_PK" primaryKey="true"/>
+    <column name="USER_NAME" type="varchar(100)" nullable="false"/>
+    <column name="TOKEN_HASH" type="varchar(40)" nullable="false"/>
+    <column name="NOTE" type="varchar(100)" nullable="false"/>
+    <column name="CAN_WRITE" type="boolean" nullable="false"/>
+    <column name="EXPIRES" type="datetime" nullable="true"/>
+    <column name="LAST_USED" type="datetime" nullable="true"/>
+    <column name="REGISTERED_DATE" type="datetime" nullable="false"/>
+  </createTable>
+
+  <addUniqueConstraint constraintName="IDX_MVN_TOKEN_TOKEN_HASH" tableName="MVN_TOKEN" columnNames="TOKEN_HASH"/>
+  <addForeignKeyConstraint constraintName="IDX_MVN_TOKEN_FK0" baseTableName="MVN_TOKEN" baseColumnNames="USER_NAME" referencedTableName="ACCOUNT" referencedColumnNames="USER_NAME" onDelete="CASCADE" onUpdate="CASCADE"/>
+</changeSet>

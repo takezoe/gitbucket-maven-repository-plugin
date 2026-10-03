@@ -2,12 +2,12 @@ package io.github.gitbucket.mavenrepository.controller
 
 import gitbucket.core.controller.Context
 import gitbucket.core.model.Account
-import gitbucket.core.service.SystemSettingsService
+import gitbucket.core.service.{AccountService, SystemSettingsService}
 import gitbucket.core.service.SystemSettingsService.{BasicBehavior, SystemSettings}
 import gitbucket.core.util.Keys
 import io.github.gitbucket.mavenrepository.{RegistryPath, TestDatabase}
 import io.github.gitbucket.mavenrepository.model.Profile.profile.blockingApi._
-import io.github.gitbucket.mavenrepository.service.MavenRepositoryService
+import io.github.gitbucket.mavenrepository.service.{MavenRepositoryService, MavenTokenService}
 import ch.qos.logback.classic.{Level, Logger}
 import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.core.read.ListAppender
@@ -97,9 +97,14 @@ class MavenRepositoryControllerWithNonAdminTests extends ScalatraFunSuite {
 
 // Runs against a database created by the plugin's migrations, so the default `releases` and `snapshots`
 // repositories exist and are public. Anonymous access is disabled for the instance.
-class MavenRepositoryControllerWithDatabaseTests extends ScalatraFunSuite with MavenRepositoryService {
+class MavenRepositoryControllerWithDatabaseTests extends ScalatraFunSuite with MavenRepositoryService
+  with MavenTokenService with AccountService {
   private implicit val session: Session = TestDatabase.create().createSession()
   private var loginAccount: Option[Account] = None
+  private var checkedPasswords = Seq.empty[String]
+
+  createAccount("test", "password", "Test User", "test@example.com", isAdmin = false, None, None)
+  createAccount("other", "password", "Other User", "other@example.com", isAdmin = false, None, None)
 
   // Stands in for GitBucket's TransactionFilter, which provides the controller's DB session.
   addFilter(new Filter {
@@ -109,14 +114,21 @@ class MavenRepositoryControllerWithDatabaseTests extends ScalatraFunSuite with M
     }
   }, "/*")
 
+  addFilter(new MavenTokenController() {
+    override implicit def context: Context =
+      MavenRepositoryControllerTest.buildContext(loginAccount, allowAnonymousAccess = false)
+  }, "/*")
+
   addFilter(new MavenRepositoryController() {
     override implicit def context: Context =
       MavenRepositoryControllerTest.buildContext(loginAccount, allowAnonymousAccess = false)
 
     override def authenticate(settings: SystemSettings, userName: String, password: String)
-                             (implicit s: Session): Option[Account] =
+                             (implicit s: Session): Option[Account] = {
+      checkedPasswords :+= password
       if (userName == "test" && password == "secret") Some(MavenRepositoryControllerTest.buildAccount(isAdmin = false))
       else None
+    }
   }, "/*")
 
   override def afterAll(): Unit = {
@@ -127,10 +139,17 @@ class MavenRepositoryControllerWithDatabaseTests extends ScalatraFunSuite with M
   private def basicAuth(user: String, password: String): Map[String, String] =
     Map("Authorization" -> ("Basic " + Base64.getEncoder.encodeToString(s"$user:$password".getBytes(StandardCharsets.UTF_8))))
 
-  private def asAdmin[A](action: => A): A = {
-    loginAccount = Some(MavenRepositoryControllerTest.buildAccount(isAdmin = true))
+  private def bearer(secret: String): Map[String, String] = Map("Authorization" -> s"Bearer $secret")
+
+  private def asAdmin[A](action: => A): A = asUser(isAdmin = true)(action)
+
+  private def asUser[A](isAdmin: Boolean = false)(action: => A): A = {
+    loginAccount = Some(MavenRepositoryControllerTest.buildAccount(isAdmin))
     try action finally loginAccount = None
   }
+
+  private def token(canWrite: Boolean, userName: String = "test", expires: Option[Date] = None): String =
+    createMavenToken(userName, "ci", canWrite, expires)._2
 
   private def artifact(registry: String, path: String) = Paths.get(RegistryPath, registry, path)
 
@@ -325,6 +344,124 @@ class MavenRepositoryControllerWithDatabaseTests extends ScalatraFunSuite with M
       }
       getMavenRepository("releases").flatMap(_.description) should equal(Some("Releases"))
     }
+  }
+
+  test("a read-and-write token works as the Basic auth password for uploads and deletes") {
+    val secret = token(canWrite = true)
+    val messages = logged {
+      put("/maven/snapshots/token/a.jar", "a".getBytes, basicAuth("test", secret)) {
+        status should equal(200)
+      }
+      delete("/maven/snapshots/token/a.jar", headers = basicAuth("test", secret)) {
+        status should equal(200)
+      }
+    }
+    messages should equal(Seq(
+      "Maven repository 'snapshots': /token/a.jar uploaded by test (token 'ci')",
+      "Maven repository 'snapshots': /token/a.jar deleted by test (token 'ci')"
+    ))
+  }
+
+  test("a read token can download from private repositories, but not upload or delete") {
+    createRegistry("token-read", None, overwrite = true, isPrivate = true)
+    Files.writeString(artifact("token-read", "a.txt"), "private")
+    val secret = token(canWrite = false)
+    get("/maven/token-read/a.txt", headers = basicAuth("test", secret)) {
+      status should equal(200)
+      body should equal("private")
+    }
+    put("/maven/token-read/b.txt", "b".getBytes, basicAuth("test", secret)) {
+      status should equal(403)
+    }
+    delete("/maven/token-read/a.txt", headers = basicAuth("test", secret)) {
+      status should equal(403)
+    }
+    Files.exists(artifact("token-read", "b.txt")) should equal(false)
+    Files.exists(artifact("token-read", "a.txt")) should equal(true)
+  }
+
+  test("a token works as a bearer token") {
+    put("/maven/snapshots/token/bearer.jar", "a".getBytes, bearer(token(canWrite = true))) {
+      status should equal(200)
+    }
+    Files.exists(artifact("snapshots", "token/bearer.jar")) should equal(true)
+  }
+
+  test("a token only works with the user name of its owner") {
+    put("/maven/snapshots/token/owner.jar", "a".getBytes, basicAuth("other", token(canWrite = true))) {
+      status should equal(401)
+    }
+    Files.exists(artifact("snapshots", "token/owner.jar")) should equal(false)
+  }
+
+  test("expired and unknown tokens are unauthorized and never checked as a password") {
+    val expired = token(canWrite = true, expires = Some(new Date(System.currentTimeMillis - 1000)))
+    checkedPasswords = Nil
+    put("/maven/snapshots/token/expired.jar", "a".getBytes, basicAuth("test", expired)) {
+      status should equal(401)
+      header("WWW-Authenticate") should equal("Basic realm=\"GitBucket Maven Repository\"")
+    }
+    put("/maven/snapshots/token/unknown.jar", "a".getBytes, basicAuth("test", "gbmvn_unknown")) {
+      status should equal(401)
+    }
+    put("/maven/snapshots/token/bearer.jar", "a".getBytes, bearer("secret")) {
+      status should equal(401)
+    }
+    checkedPasswords should equal(Nil)
+  }
+
+  test("users create and delete their own tokens; other users' tokens are not deleted") {
+    val messages = logged {
+      asUser() {
+        post("/maven/_tokens", "note" -> "laptop", "canWrite" -> "false", "expiresInDays" -> "30") {
+          status should equal(302)
+        }
+      }
+    }
+    val created = getMavenTokens("test").find(_.note == "laptop").get
+    created.canWrite should equal(false)
+    created.expires.map(_.after(new Date())) should equal(Some(true))
+    messages should equal(Seq("Maven token 'laptop' (read) created by test"))
+
+    val othersToken = createMavenToken("other", "theirs", canWrite = false, None)._1
+    asUser() {
+      post(s"/maven/_tokens/${othersToken.tokenId}/_delete") {
+        status should equal(302)
+      }
+      post(s"/maven/_tokens/${created.tokenId}/_delete") {
+        status should equal(302)
+      }
+    }
+    getMavenToken(othersToken.tokenId) should not equal(None)
+    getMavenToken(created.tokenId) should equal(None)
+  }
+
+  test("the token page needs a signed-in user") {
+    get("/maven/_tokens") {
+      status should equal(401)
+    }
+    post("/maven/_tokens", "note" -> "x", "expiresInDays" -> "0") {
+      status should equal(401)
+    }
+  }
+
+  test("admins can delete any token") {
+    val othersToken = createMavenToken("other", "theirs", canWrite = false, None)._1
+    asUser() {
+      post(s"/admin/maven/_tokens/${othersToken.tokenId}/_delete") {
+        status should equal(401)
+      }
+    }
+    getMavenToken(othersToken.tokenId) should not equal(None)
+    val messages = logged {
+      asAdmin {
+        post(s"/admin/maven/_tokens/${othersToken.tokenId}/_delete") {
+          status should equal(302)
+        }
+      }
+    }
+    getMavenToken(othersToken.tokenId) should equal(None)
+    messages should equal(Seq("Maven token 'theirs' of other deleted by test"))
   }
 }
 

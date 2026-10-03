@@ -9,7 +9,7 @@ import gitbucket.core.servlet.Database
 import gitbucket.core.model.Profile.profile.blockingApi._
 import io.github.gitbucket.mavenrepository._
 import io.github.gitbucket.mavenrepository.command.{LsCommand, MkdirCommand}
-import io.github.gitbucket.mavenrepository.controller.MavenRepositoryController
+import io.github.gitbucket.mavenrepository.controller.{MavenRepositoryController, MavenTokenController}
 import io.github.gitbucket.mavenrepository.service.MavenRepositoryService
 import io.github.gitbucket.solidbase.migration.{LiquibaseMigration, Migration}
 import io.github.gitbucket.solidbase.model.Version
@@ -46,7 +46,8 @@ class Plugin extends gitbucket.core.plugin.Plugin with MavenRepositoryService {
     new Version("1.8.0"),
     new Version("1.9.0"),
     new Version("1.10.0"),
-    new Version("1.11.0")
+    new Version("1.11.0"),
+    new Version("1.12.0", new LiquibaseMigration("update/gitbucket-maven-repository_1.12.0.xml"))
   )
 
   override val sshCommandProviders = Seq({
@@ -103,7 +104,9 @@ class Plugin extends gitbucket.core.plugin.Plugin with MavenRepositoryService {
 
   private val controller = new MavenRepositoryController()
 
+  // The token page comes first: the repository controller would take "_tokens" for a repository name.
   override val controllers = Seq(
+    "/maven/_tokens" -> new MavenTokenController(),
     "/maven/*"       -> controller,
     "/admin/maven/*" -> controller
   )
@@ -125,6 +128,10 @@ class Plugin extends gitbucket.core.plugin.Plugin with MavenRepositoryService {
 
   override val systemSettingMenus: Seq[Context => Option[Link]] = Seq(
     _ => Some(Link("maven", "Maven repositories", "admin/maven", Some("package")))
+  )
+
+  override val accountSettingMenus: Seq[Context => Option[Link]] = Seq(
+    _ => Some(Link("maventokens", "Maven tokens", "maven/_tokens"))
   )
 
 }

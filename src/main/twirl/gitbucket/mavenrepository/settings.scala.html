@@ -1,4 +1,5 @@
-@(registries: Seq[io.github.gitbucket.mavenrepository.model.Registry])(implicit context: gitbucket.core.controller.Context)
+@(registries: Seq[io.github.gitbucket.mavenrepository.model.Registry],
+  tokens: Seq[io.github.gitbucket.mavenrepository.model.MavenToken])(implicit context: gitbucket.core.controller.Context)
 @defining(context.settings.basicBehavior.allowAnonymousAccess){ allowAnonymousAccess =>
 @gitbucket.core.html.main("Maven repositories") {
   @gitbucket.core.admin.html.menu("maven") {
@@ -47,6 +48,12 @@
       Delete &quot;<span class="confirm-name"></span>&quot;?
     }{
       <p>This deletes the repository and all its artifacts. There is no going back.</p>
+    }
+    @if(tokens.nonEmpty){
+      <div class="panel panel-default">
+        <div class="panel-heading strong">Maven tokens</div>
+        @gitbucket.mavenrepository.html.tokenlist(tokens, showUser = true, s"${context.path}/admin/maven/_tokens")
+      </div>
     }
   }
 }

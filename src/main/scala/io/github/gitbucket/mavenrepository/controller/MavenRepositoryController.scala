@@ -9,8 +9,10 @@ import gitbucket.core.model.Account
 import gitbucket.core.service.AccountService
 import gitbucket.core.util.{AdminAuthenticator, AuthUtil, FileUtil}
 import gitbucket.core.util.Implicits._
+import io.github.gitbucket.mavenrepository.model.Registry
 import io.github.gitbucket.mavenrepository.service.MavenRepositoryService
 import org.apache.commons.io.{FileUtils, IOUtils}
+import org.slf4j.LoggerFactory
 import org.scalatra.forms._
 import org.scalatra.i18n.Messages
 import org.scalatra.{ActionResult, NotAcceptable, Ok}
@@ -20,21 +22,60 @@ import org.scalatra.BadRequest
 class MavenRepositoryController extends ControllerBase with AccountService with MavenRepositoryService
   with AdminAuthenticator {
 
-  case class RepositoryCreateForm(name: String, description: Option[String], overwrite: Boolean, isPrivate: Boolean)
-  case class RepositoryEditForm(description: Option[String], overwrite: Boolean, isPrivate: Boolean)
+  private val logger = LoggerFactory.getLogger(classOf[MavenRepositoryController])
+
+  case class RepositoryCreateForm(name: String, description: Option[String], overwrite: Boolean, isPrivate: Boolean,
+                                  confirmPublic: Boolean)
+  case class RepositoryEditForm(description: Option[String], overwrite: Boolean, isPrivate: Boolean,
+                                confirmPublic: Boolean)
 
   val repositoryCreateForm = mapping(
-    "name"        -> trim(label("Name", text(required, identifier, maxlength(100), unique))),
-    "description" -> trim(label("Description", optional(text()))),
-    "overwrite"   -> trim(boolean()),
-    "isPrivate"   -> trim(boolean())
-  )(RepositoryCreateForm.apply)
+    "name"          -> trim(label("Name", text(required, identifier, maxlength(100), unique))),
+    "description"   -> trim(label("Description", optional(text()))),
+    "overwrite"     -> trim(boolean()),
+    "isPrivate"     -> trim(boolean()),
+    "confirmPublic" -> trim(boolean())
+  )(RepositoryCreateForm.apply).verifying { form =>
+    confirmPublicRequired(wasPrivate = true, form.isPrivate, form.confirmPublic)
+  }
 
   val repositoryEditForm = mapping(
-    "description" -> trim(label("Description", optional(text()))),
-    "overwrite"   -> trim(boolean()),
-    "isPrivate"   -> trim(boolean())
-  )(RepositoryEditForm.apply)
+    "description"   -> trim(label("Description", optional(text()))),
+    "overwrite"     -> trim(boolean()),
+    "isPrivate"     -> trim(boolean()),
+    "confirmPublic" -> trim(boolean())
+  )(RepositoryEditForm.apply).verifying { form =>
+    val wasPrivate = getMavenRepository(params("name")).forall(_.isPrivate)
+    confirmPublicRequired(wasPrivate, form.isPrivate, form.confirmPublic)
+  }
+
+  // With anonymous access disabled, making a repository public is an exception that must be confirmed.
+  private def confirmPublicRequired(wasPrivate: Boolean, isPrivate: Boolean, confirmPublic: Boolean): Seq[(String, String)] =
+    if (!context.settings.basicBehavior.allowAnonymousAccess && wasPrivate && !isPrivate && !confirmPublic) {
+      Seq("confirmPublic" -> "Confirm that this repository should be readable without authentication.")
+    } else Nil
+
+  private def userName: String = context.loginAccount.map(_.userName).getOrElse("?")
+
+  private def access(registry: Registry): String = if (registry.isPrivate) "private" else "public"
+
+  private def describe(registry: Registry): String = s"${access(registry)}, overwrite=${registry.overwrite}"
+
+  private def describeChanges(before: Registry, after: Registry): String =
+    Seq(
+      Option.when(before.isPrivate != after.isPrivate)(s"${access(before)} -> ${access(after)}"),
+      Option.when(before.overwrite != after.overwrite)(s"overwrite ${before.overwrite} -> ${after.overwrite}"),
+      Option.when(before.description != after.description)("description changed")
+    ).flatten.mkString(", ")
+
+  private def logChange(message: String, registry: Registry, details: String, madePublic: Boolean): Unit = {
+    val text = s"Maven repository '${registry.name}' ${message} by ${userName} (${details})"
+    if (madePublic && !context.settings.basicBehavior.allowAnonymousAccess) {
+      logger.warn(s"${text}: public although anonymous access is disabled")
+    } else {
+      logger.info(text)
+    }
+  }
 
 
   get("/admin/maven")(adminOnly {
@@ -45,8 +86,10 @@ class MavenRepositoryController extends ControllerBase with AccountService with 
     gitbucket.mavenrepository.html.form(None)
   })
 
-  post("/admin/maven/_new", repositoryCreateForm)(adminOnlyWithForm { form =>
+  post("/admin/maven/_new", repositoryCreateForm)(adminOnlyWithForm { (form: RepositoryCreateForm) =>
     createRegistry(form.name, form.description, form.overwrite, form.isPrivate)
+    val registry = Registry(form.name, form.description, form.overwrite, form.isPrivate)
+    logChange("created", registry, describe(registry), madePublic = !form.isPrivate)
     redirect("/admin/maven")
   })
 
@@ -54,15 +97,29 @@ class MavenRepositoryController extends ControllerBase with AccountService with 
     gitbucket.mavenrepository.html.form(getMavenRepository(params("name")))
   })
 
-  post("/admin/maven/:name/_edit", repositoryEditForm)(adminOnlyWithForm { form =>
-    updateRegistry(params("name"), form.description, form.overwrite, form.isPrivate)
-    redirect("/admin/maven")
+  post("/admin/maven/:name/_edit", repositoryEditForm)(adminOnlyWithForm { (form: RepositoryEditForm) =>
+    getMavenRepository(params("name")).map { before =>
+      updateRegistry(before.name, form.description, form.overwrite, form.isPrivate)
+      val after = before.copy(description = form.description, overwrite = form.overwrite, isPrivate = form.isPrivate)
+      if (after != before) {
+        logChange("changed", after, describeChanges(before, after), madePublic = before.isPrivate && !after.isPrivate)
+      }
+      redirect("/admin/maven")
+    } getOrElse NotFound()
   })
 
   post("/admin/maven/:name/_delete")(adminOnly {
-    deleteRegistry(params("name"))
+    getMavenRepository(params("name")).foreach { registry =>
+      deleteRegistry(registry.name)
+      logChange("deleted", registry, describe(registry), madePublic = false)
+    }
     redirect("/admin/maven")
   })
+
+  // Browsing and downloading also accept the GitBucket session, so signed-in users get no Basic auth prompt.
+  // Uploads and deletes stay on Basic auth only.
+  private def sessionOrBasicAuthentication(): Either[ActionResult, Account] =
+    context.loginAccount.map(Right(_)).getOrElse(basicAuthentication())
 
   private def basicAuthentication(): Either[ActionResult, Account] = {
     request.header("Authorization").flatMap {
@@ -91,6 +148,9 @@ class MavenRepositoryController extends ControllerBase with AccountService with 
       val f = new File(fullPath)
       FileUtils.deleteQuietly(f)
     }
+    if (files.nonEmpty) {
+      logger.info(s"Maven repository '${name}': ${files.mkString(", ")} in /${path} deleted by ${userName}")
+    }
     if (path.nonEmpty) {
       redirect(s"/maven/${name}/${path}/")
     } else {
@@ -112,7 +172,7 @@ class MavenRepositoryController extends ControllerBase with AccountService with 
       // Find registry
       registry <- getMavenRepository(name).toRight { NotFound() }
       // Basic authentication
-      _ <- if(registry.isPrivate){ basicAuthentication().map(x => Some(x)) } else Right(None)
+      _ <- if(registry.isPrivate){ sessionOrBasicAuthentication().map(x => Some(x)) } else Right(None)
       //path = multiParams("splat").head
       file = new File(s"${RegistryPath}/${name}/${path}")
     } yield {
@@ -152,8 +212,8 @@ class MavenRepositoryController extends ControllerBase with AccountService with 
     val result = for {
       // Find registry
       registry <- getMavenRepository(name).toRight { NotFound() }
-      // Basic authentication
-      _ <- if(registry.isPrivate){ basicAuthentication().map(x => Some(x)) } else Right(None)
+      // Basic authentication: uploads always need it, also for public repositories
+      account <- basicAuthentication()
       // Overwrite check
       file = new File(s"${RegistryPath}/${name}/${path}")
       _    <- if(file.getName == "maven-metadata.xml" || file.getName.startsWith("maven-metadata.xml.")){
@@ -171,6 +231,7 @@ class MavenRepositoryController extends ControllerBase with AccountService with 
       Using.resource(new FileOutputStream(file)){ out =>
         IOUtils.copy(request.getInputStream, out)
       }
+      logger.debug(s"Maven repository '${name}': /${path} uploaded by ${account.userName}")
       Ok()
     }
 
@@ -185,7 +246,7 @@ class MavenRepositoryController extends ControllerBase with AccountService with 
 
     val result = for {
       registry <- getMavenRepository(name).toRight(NotFound())
-      _        <- basicAuthentication()
+      account  <- basicAuthentication()
       path     =  multiParams("splat").head
       file     =  Paths.get(RegistryPath, name, path)
       repoBase =  Paths.get(RegistryPath, registry.name)
@@ -196,12 +257,13 @@ class MavenRepositoryController extends ControllerBase with AccountService with 
         FileUtils.cleanDirectory(file.toFile)
       } else {
         // remove file and remove the directory if it's empty
-        FileUtils.deleteDirectory(file.toFile)
+        FileUtils.forceDelete(file.toFile)
         val parent = file.getParent
         if (!Files.isSameFile(repoBase, parent)) {
           FileUtil.deleteDirectoryIfEmpty(parent.toFile)
         }
       }
+      logger.info(s"Maven repository '${name}': /${path} deleted by ${account.userName}")
       Ok()
     }
 

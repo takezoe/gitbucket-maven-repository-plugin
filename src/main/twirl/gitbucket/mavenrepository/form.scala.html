@@ -1,7 +1,8 @@
 @(registry: Option[io.github.gitbucket.mavenrepository.model.Registry])(implicit context: gitbucket.core.controller.Context)
+@defining(context.settings.basicBehavior.allowAnonymousAccess){ allowAnonymousAccess =>
 @gitbucket.core.html.main("Maven repositories") {
   @gitbucket.core.admin.html.menu("maven") {
-    <form method="POST" validate="true" autocomplete="off">
+    <form id="registry-form" method="POST" validate="true" autocomplete="off">
       <fieldset class="form-group">
         <label for="name" class="col-md-2">Repository name</label>
         <div class="col-md-10">
@@ -21,11 +22,32 @@
           <input type="checkbox" id="overwrite" name="overwrite" @if(registry.exists(_.overwrite)){checked}/> Allow overwrite
         </label>
       </fieldset>
+      @defining(registry.map(_.isPrivate).getOrElse(!allowAnonymousAccess)){ isPrivate =>
       <fieldset class="form-group">
-        <label for="isPrivate" class="col-md-12">
-          <input type="checkbox" id="isPrivate" name="isPrivate" @if(registry.exists(_.isPrivate)){checked}/> Require Basic authentication
-        </label>
+        <div class="col-md-12">
+          <label class="strong">Access</label>
+          <label class="radio">
+            <input type="radio" name="isPrivate" value="false" @if(!isPrivate){checked}>
+            <span class="strong"><i class="octicon octicon-repo"></i>&nbsp;Public</span>
+            <div class="normal muted">
+              Anyone can browse and download artifacts without signing in.
+              @if(!allowAnonymousAccess){
+                <br><i class="octicon octicon-alert" style="color:#BD2C00;"></i>
+                Anonymous access is disabled for GitBucket; this repository would be an exception.
+              }
+            </div>
+          </label>
+          <label class="radio">
+            <input type="radio" name="isPrivate" value="true" @if(isPrivate){checked}>
+            <span class="strong"><i class="octicon octicon-lock"></i>&nbsp;Private</span>
+            <div class="normal muted">Downloads require a GitBucket login.</div>
+          </label>
+          <p class="normal muted">Uploads and deletes always require a GitBucket login.</p>
+          <input type="hidden" id="confirmPublic" name="confirmPublic" value="false"/>
+          <span id="error-confirmPublic" class="error"></span>
+        </div>
       </fieldset>
+      }
       <fieldset class="form-group">
         @if(registry.isEmpty){
           <input type="submit" value="Create" class="btn btn-success" formaction="@context.path/admin/maven/_new" />
@@ -35,5 +57,35 @@
         <a href="@context.path/admin/maven" class="btn btn-default">Cancel</a>
       </fieldset>
     </form>
+    @if(!allowAnonymousAccess && registry.forall(_.isPrivate)){
+      @gitbucket.mavenrepository.html.confirm("confirm-public", "Make public"){
+        Make &quot;<span class="confirm-name"></span>&quot; public?
+      }{
+        <p>Anyone will be able to browse and download its artifacts without signing in, although anonymous access
+          is disabled for GitBucket.</p>
+        <p class="muted">Uploads and deletes still require a GitBucket login.</p>
+      }
+    }
   }
+}
+@if(!allowAnonymousAccess && registry.forall(_.isPrivate)){
+<script>
+$(function(){
+  // Runs before GitBucket's form validation; the server rejects the change without confirmPublic.
+  $('#registry-form').submit(function(){
+    if($('input[name=isPrivate]:checked').val() !== 'false' || $('#confirmPublic').val() === 'true'){
+      return true;
+    }
+    $('#confirm-public .confirm-name').text($('#name').val());
+    $('#confirm-public').modal('show');
+    return false;
+  });
+  $('#confirm-public-ok').click(function(){
+    $('#confirmPublic').val('true');
+    $('#confirm-public').modal('hide');
+    $('#registry-form').submit();
+  });
+});
+</script>
+}
 }

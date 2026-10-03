@@ -21,12 +21,21 @@ It's possible to add more repositories and configure them at the administration 
 
 ![Maven repository settings](maven-repository-settings.png)
 
-You can specify whether artifacts are overwritable for each repository. In addition, it's possible to make repository private. Private repositories require basic authentication by GitBucket account to access.
+For each repository you can choose:
+
+- **Allow overwrite**: whether an existing artifact can be uploaded again.
+- **Private**: whether downloading and browsing require a GitBucket login. Build tools send it with HTTP Basic authentication; users signed in to GitBucket can browse in the browser without a password prompt.
+
+Uploading and deleting artifacts always require a GitBucket login, also for public repositories (since 1.11.0).
+
+Public repositories can be downloaded without a login even if anonymous access is denied in GitBucket's system
+settings. On such an instance, new repositories are private by default, and making one public asks for confirmation.
 
 ## Compatibility
 
 Plugin version | GitBucket version
 :--------------|:--------------------
+1.11.x          | 4.48.x -
 1.10.x          | 4.48.x -
 1.9.x          | 4.47.x -
 1.8.x          | 4.37.1 -
@@ -58,7 +67,7 @@ resolvers ++= Seq(
  "GitBucket Releases Repository"  at "http://localhost:8080/maven/releases"
 )
 
-// If repository is private, you have to add authentication information
+// Needed for publishing, and for resolving from private repositories
 credentials += Credentials("GitBucket Maven Repository", "localhost", "username", "password")
 ```
 
